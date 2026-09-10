@@ -10,11 +10,12 @@ Open-source MCP server with full read/write access to **Figma and FigJam** via p
 **Highlights**
 - No Figma API token required
 - No rate limits — free plan friendly
-- **Read and Write** live Figma/FigJam data via plugin bridge — 76 tools total (73 from the Go reference, `create_sticky` / `create_connector` for FigJam, and `use_figma` for everything else)
+- **Read and Write** live Figma/FigJam data via plugin bridge — 84 tools total (73 from the Go reference, plus `get_status`, `execute_code`, eight FigJam tools, and the `use_figma` escape hatch)
 - Full design automation — styles, variables, components, prototypes, and content
 - Design strategies included — 12 MCP prompts built in
 - Native binary, fast startup, low memory
-- Speaks MCP spec revisions up to 2025-11-25 (newest in rmcp 3.2); negotiates down for older clients
+- Plugin bundled in the binary — the server self-installs it on first run, no download step
+- Built on rmcp 3.2; negotiates MCP protocol revision with each client
 
 ## Why this exists
 
@@ -107,9 +108,13 @@ Server flags: `--ip` (default `127.0.0.1`), `--port` (default `1998`).
 
 ### 2. Install the Figma plugin
 
-1. In Figma Desktop: **Plugins → Development → Import plugin from manifest**
-2. Select `manifest.json` from the release `plugin.zip` (or `plugin/manifest.json` after `make build-ts`)
+The plugin is bundled inside the server binary — no download or build step.
+
+1. Start the server once (any method above). On startup it writes `manifest.json`, `dist/code.js`, and `dist/index.html` to `~/.figma-mcp-rs/plugin/` (Windows: `%USERPROFILE%\.figma-mcp-rs\plugin\`) and logs the path.
+2. In Figma Desktop: **Plugins → Development → Import plugin from manifest** → select `~/.figma-mcp-rs/plugin/manifest.json`
 3. Run the plugin inside any **Figma or FigJam** file — it connects to the server over `ws://127.0.0.1:1998` (host/port configurable in the plugin UI)
+
+If a tool fails with `plugin not connected`, call `get_status` — it diagnoses the bridge and returns setup instructions.
 
 Multiple server instances are safe: the first to bind the port becomes leader and owns the plugin connection; others become followers that proxy tool calls and take over automatically if the leader dies.
 
@@ -117,17 +122,24 @@ Multiple server instances are safe: the first to bind the port becomes leader an
 
 The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "dev"]`):
 - **Reads** work in both: `get_document`/`get_design_context` serialize FigJam node types (STICKER, CONNECTOR, MARKER, WIDGET, EMBED, MEDIA…)
-- **FigJam-only writes**: `create_sticky`, `create_connector`
+- **FigJam writes** are eight named tools: `create_sticky`, `create_stickies`, `create_connector`, `create_shape_with_text`, `create_table`, `create_code_block`, `auto_arrange`, `get_board_contents`
 - **Figma-only tools** (styles, variables, components, prototype reactions, auto-layout) return a clear error in FigJam files
-- **Slides, FigJam tables / shapes-with-text / code blocks / labels**: no named tool — use `use_figma`
+- **Remaining gap** — Slides and anything else unwrapped: use `use_figma`
 
 ## Available Tools
+
+### Status
+
+| Tool | Description |
+|------|-------------|
+| `get_status` | Check whether the plugin bridge is connected; returns setup instructions when it is not. Call this first if any tool fails with `plugin not connected`. |
 
 ### Escape hatch
 
 | Tool | Description |
 |------|-------------|
-| `use_figma` | Run Plugin API JavaScript inside the file. The code is the body of `async () => { … }`: top-level `await` works and only the `return` value comes back (console.log is discarded; the value must be JSON-serializable, so return IDs/counts/names, not node objects). Covers what the named tools don't wrap: Slides, FigJam tables/shapes/code blocks/labels, component variants and properties, vector networks, styled text ranges, variable scopes, bulk edits in one round-trip. |
+| `use_figma` | Run Plugin API JavaScript inside the file. The code is the body of `async () => { … }`: top-level `await` works and only the `return` value comes back (console.log is discarded; the value must be JSON-serializable, so return IDs/counts/names, not node objects). Covers what the named tools don't wrap: Slides, component variants and properties, vector networks, styled text ranges, variable scopes, bulk edits in one round-trip. |
+| `execute_code` | Run arbitrary Plugin API code in the same sandbox — the code runs as an async function body, with an optional `timeoutMs` (1–25000 ms, default 5000) for long-running operations. Runs in the user's open file and is undoable with Cmd/Ctrl+Z. Use only for operations the dedicated tools don't cover; prefer the specific tool when one exists. |
 
 ### Write — Create
 
@@ -246,12 +258,18 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 | `save_screenshots` | Export images to disk (server-side write) |
 | `export_frames_to_pdf` | Multiple frames as one multi-page PDF (server-side merge) |
 
-### FigJam (new)
+### FigJam
 
 | Tool | Description |
 |------|-------------|
 | `create_sticky` | Create a sticky note with text (FigJam only) |
+| `create_stickies` | Create multiple sticky notes at once, with optional grid auto-layout (FigJam only) |
 | `create_connector` | Create a connector, optionally between two nodes (FigJam only) |
+| `create_shape_with_text` | Create a shape with text — rectangles, circles, diamonds, … (FigJam only) |
+| `create_table` | Create a table with optional cell text content (FigJam only) |
+| `create_code_block` | Create a code block with syntax highlighting (FigJam only) |
+| `auto_arrange` | Auto-arrange objects in grid, row, or column layout (FigJam only) |
+| `get_board_contents` | All objects and connectors on the current FigJam page, with text content and connection data |
 
 ### MCP Prompts (12)
 
@@ -267,6 +285,9 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 make test      # cargo test + plugin bun test
 make build     # release binary + plugin dist
 ```
+
+- CI: fmt + clippy + tests (linux amd64/arm64, windows, macos) + plugin typecheck/test/build on every PR.
+- Releases: conventional commits (`feat:`, `fix:`) on main → release-please opens a version-bump PR (Cargo.toml, Cargo.lock, npm/package.json, CHANGELOG) → merging it tags, builds binaries + plugin.zip, publishes npm and the multi-arch image at `ghcr.io/jirayusueb/figma-mcp-rs`.
 
 - Server: Rust (tokio, axum, rmcp). Plugin: TypeScript + SolidJS, built with Vite (UI inlined to `dist/index.html`, core IIFE `dist/code.js`).
 - Toolchain: Bun 1.4.2, TypeScript 7.
