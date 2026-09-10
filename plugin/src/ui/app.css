@@ -1,244 +1,156 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@import "tailwindcss";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/jetbrains-mono";
+@source "../";
+
+/* Dark is the default theme; light opts in via [data-theme="light"].
+   Token values mirror DESIGN.md (the system of record). */
+@custom-variant dark (&:not([data-theme="light"] *));
+
+@theme inline {
+  --font-sans: "Space Grotesk Variable", "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-positive: var(--positive);
+  --color-rule-strong: var(--rule-strong);
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
-  background: #1e1e1e;
-  color: #e0e0e0;
-  height: 100vh;
+/* ─── Dark (default) ─────────────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  --radius: 0rem;
+  --background: #0e0d0b;
+  --foreground: #e8e3d6;
+  --card: #15130f;
+  --card-foreground: #e8e3d6;
+  --primary: #d49a4f;
+  --primary-foreground: #0e0d0b;
+  --secondary: #0a0907;
+  --secondary-foreground: #e8e3d6;
+  --muted: #0a0907;
+  --muted-foreground: #807a6e;
+  --accent: #2a2620;
+  --accent-foreground: #e8e3d6;
+  --destructive: #b56a4a;
+  --border: #2a2620;
+  --input: #3d3830;
+  --ring: #d49a4f;
+  --positive: #7fa05f;
+  --rule-strong: #3d3830;
 }
 
-.container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 16px;
-  gap: 12px;
+/* ─── Light ──────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --background: #f4f0e4;
+  --foreground: #1a1814;
+  --card: #ffffff;
+  --card-foreground: #1a1814;
+  --primary: #946325;
+  --primary-foreground: #f4f0e4;
+  --secondary: #eae5d7;
+  --secondary-foreground: #1a1814;
+  --muted: #eae5d7;
+  --muted-foreground: #75695b;
+  --accent: #d9d3c2;
+  --accent-foreground: #1a1814;
+  --destructive: #8a4528;
+  --border: #d9d3c2;
+  --input: #b8b2a0;
+  --ring: #946325;
+  --positive: #4d6b32;
+  --rule-strong: #b8b2a0;
 }
 
-.info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  html {
+    font-size: 12px; /* Figma panel density */
+  }
 
-.info-label {
-  color: #888;
-}
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    height: 100vh;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
+  }
 
-.info-value {
-  color: #e0e0e0;
-  font-weight: 500;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  /* Mount node must carry the panel height so the footer anchors to the bottom edge */
+  body > div {
+    height: 100%;
+  }
 
-.working-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #1a2e3a;
-  border: 1px solid #2563eb44;
-  border-radius: 8px;
-  color: #60a5fa;
-  font-size: 11px;
-  font-weight: 500;
-}
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 
-.spinner {
-  width: 10px;
-  height: 10px;
-  border: 2px solid #60a5fa44;
-  border-top-color: #60a5fa;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
+  /* Caret and scrollbar carry the palette (craft floor: browser surfaces) */
+  [data-slot="text-field-input"] {
+    caret-color: var(--ring);
+  }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--rule-strong);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-.footer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+  ::selection {
+    background: var(--primary);
+    color: var(--background);
+  }
 
-.footer-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
+  /* Grain overlay — subtle analog texture */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 9999;
+  }
 
-.links {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.footer-link {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  text-decoration: none;
-  color: #888;
-  font-size: 11px;
-}
-
-.footer-link:hover {
-  color: #e0e0e0;
-}
-
-.author {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  text-decoration: none;
-  color: #888;
-  font-size: 11px;
-}
-
-.author:hover {
-  color: #e0e0e0;
-}
-
-.author img {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-}
-
-/* Server address button — shows current host:port, click to edit */
-.server-addr {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 10px;
-  font-family: monospace;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-.server-addr:hover {
-  color: #aaa;
-  background: #2a2a2a;
-}
-
-/* Inline settings panel — takes remaining space so inputs aren't squished */
-.settings-panel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.addr-input {
-  width: 72px;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 10px;
-  font-family: monospace;
-  padding: 2px 4px;
-  outline: none;
-}
-
-.addr-input:focus {
-  border-color: #555;
-}
-
-.port-input {
-  width: 36px;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 10px;
-  font-family: monospace;
-  padding: 2px 4px;
-  outline: none;
-}
-
-.port-input:focus {
-  border-color: #555;
-}
-
-.addr-sep {
-  color: #666;
-  font-size: 10px;
-}
-
-.apply-btn,
-.cancel-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-
-.apply-btn {
-  color: #4ade80;
-}
-
-.apply-btn:hover {
-  background: #1a3a2a;
-}
-
-.cancel-btn {
-  color: #f87171;
-}
-
-.cancel-btn:hover {
-  background: #3a1a1a;
-}
-
-.badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.badge.connected {
-  background: #1a472a;
-  color: #4ade80;
-}
-
-.badge.disconnected {
-  background: #3a1a1a;
-  color: #f87171;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #f87171;
-}
-
-.dot.connected {
-  background: #4ade80;
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

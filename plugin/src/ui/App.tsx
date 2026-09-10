@@ -1,5 +1,7 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import "./app.css";
+import { Button } from "@/components/ui/button";
+import { TextField, TextFieldInput } from "@/components/ui/text-field";
 
 const RECONNECT_DELAY_MS = 1500;
 
@@ -9,6 +11,7 @@ export default function App() {
   const [pageName, setPageName] = createSignal("—");
   const [selectionCount, setSelectionCount] = createSignal(0);
   const [activeCount, setActiveCount] = createSignal(0);
+  const [lastTool, setLastTool] = createSignal("");
 
   // Configurable server address.
   // Persisted via figma.clientStorage (through plugin core) because localStorage
@@ -21,7 +24,7 @@ export default function App() {
   const [editPort, setEditPort] = createSignal(serverPort());
 
   let socket: WebSocket | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let reconnectTimer: number | undefined;
   let configLoaded = false;
 
   function connect() {
@@ -46,7 +49,7 @@ export default function App() {
       socket = null;
       setActiveCount(0);
       if (reconnectTimer === undefined) {
-        reconnectTimer = setTimeout(() => {
+        reconnectTimer = window.setTimeout(() => {
           reconnectTimer = undefined;
           connect();
         }, RECONNECT_DELAY_MS);
@@ -62,6 +65,7 @@ export default function App() {
         const payload = JSON.parse(event.data);
         if (payload.requestId) {
           setActiveCount((c) => c + 1);
+          if (payload.type) setLastTool(payload.type);
         }
         parent.postMessage({ pluginMessage: { type: "server-request", payload } }, "*");
       } catch {
@@ -138,7 +142,7 @@ export default function App() {
 
     // Fallback: if the plugin core doesn't respond within 500 ms (e.g. during
     // dev / hot-reload without a running core), connect with defaults.
-    const fallback = setTimeout(() => {
+    const fallback = window.setTimeout(() => {
       if (!configLoaded) {
         configLoaded = true;
         connect();
@@ -154,105 +158,100 @@ export default function App() {
   });
 
   return (
-    <div class="container">
-      <div class="info-section">
-        <div class="info-row">
-          <span class="info-label">File</span>
-          <span class="info-value" title={fileName()}>{fileName()}</span>
+    <div class="flex h-full flex-col overflow-hidden text-xs">
+      {/* State band — the whole panel's headline */}
+      <div class="flex flex-none items-center gap-2 border-b border-rule-strong bg-card px-3 py-2">
+        <span
+          class="size-2 flex-none"
+          classList={{ "bg-positive": connected(), "bg-destructive": !connected() }}
+        ></span>
+        <span class="text-[1.25rem] font-semibold leading-none tracking-[-0.02em]">
+          {connected() ? "Connected" : "Disconnected"}
+        </span>
+      </div>
+
+      {/* Context rows */}
+      <div class="flex flex-none flex-col divide-y divide-border/60">
+        <div class="flex items-center justify-between gap-2 px-3 py-1">
+          <span class="font-mono uppercase tracking-[0.1em] text-muted-foreground">File</span>
+          <span class="min-w-0 truncate font-mono" title={fileName()}>
+            {fileName()}
+          </span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Page</span>
-          <span class="info-value" title={pageName()}>{pageName()}</span>
+        <div class="flex items-center justify-between gap-2 px-3 py-1">
+          <span class="font-mono uppercase tracking-[0.1em] text-muted-foreground">Page</span>
+          <span class="min-w-0 truncate font-mono" title={pageName()}>
+            {pageName()}
+          </span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Selection</span>
-          <span class="info-value">{selectionCount()} node(s)</span>
+        <div class="flex items-center justify-between gap-2 px-3 py-1">
+          <span class="font-mono uppercase tracking-[0.1em] text-muted-foreground">Sel</span>
+          <span class="font-mono tabular-nums">{selectionCount()}</span>
         </div>
       </div>
+
+      {/* Activity — the running tool names itself */}
       <Show when={activeCount() > 0}>
-        <div class="working-banner">
-          <span class="spinner"></span>
-          <span>AI is working…</span>
+        <div class="flex flex-none items-center gap-2 border-y border-border/60 border-l-2 border-l-primary bg-secondary py-1 pl-2 pr-3 font-mono text-primary">
+          <span class="truncate">→ {lastTool() || "…"}</span>
+          <span class="ml-auto flex-none tabular-nums">×{activeCount()}</span>
         </div>
       </Show>
-      <div class="footer">
-        {/* Row 1: server address (left) + connection badge (right) */}
-        <div class="footer-row">
-          <Show
-            when={showSettings()}
-            fallback={
-              <button
-                class="server-addr"
-                onClick={openSettings}
-                title="Click to configure server address"
-              >
-                {serverHost()}:{serverPort()}
-              </button>
-            }
-          >
-            <div class="settings-panel">
-              <input
-                class="addr-input"
+
+      {/* Transport — inline re-point */}
+      <div class="mt-auto flex flex-none items-center border-t border-border">
+        <Show
+          when={showSettings()}
+          fallback={
+            <button
+              class="flex h-6 w-full items-center justify-between gap-2 px-3 font-mono text-muted-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+              onClick={openSettings}
+              title="Configure server address"
+            >
+              <span class="truncate">{serverHost()}:{serverPort()}</span>
+              <span aria-hidden="true">▸</span>
+            </button>
+          }
+        >
+          <div class="flex w-full items-center gap-1 px-1.5 py-1">
+            <TextField class="min-w-0 flex-1 gap-0">
+              <TextFieldInput
+                class="h-5 w-full min-w-0 px-1.5 font-mono text-xs"
                 value={editHost()}
                 onInput={(e) => setEditHost(e.currentTarget.value)}
                 placeholder="127.0.0.1"
                 onKeyDown={handleKeydown}
               />
-              <span class="addr-sep">:</span>
-              <input
-                class="port-input"
+            </TextField>
+            <TextField class="w-12 gap-0">
+              <TextFieldInput
+                class="h-5 w-full min-w-0 px-1.5 font-mono text-xs"
                 value={editPort()}
                 onInput={(e) => setEditPort(e.currentTarget.value)}
                 placeholder="1998"
                 onKeyDown={handleKeydown}
               />
-              <button class="apply-btn" onClick={applySettings} title="Apply">✓</button>
-              <button class="cancel-btn" onClick={() => setShowSettings(false)} title="Cancel">✕</button>
-            </div>
-          </Show>
-          <div class="badge" classList={{ connected: connected(), disconnected: !connected() }}>
-            <span class="dot" classList={{ connected: connected() }}></span>
-            <span>{connected() ? "Connected" : "Disconnected"}</span>
-          </div>
-        </div>
-        {/* Row 2: author (left) + bug report + feature suggestion (right) */}
-        <div class="footer-row">
-          <a
-            class="author"
-            href="https://github.com/vkhanhqui/figma-mcp-go"
-            target="_blank"
-          >
-            <img
-              src="https://avatars.githubusercontent.com/u/64468109?v=4"
-              alt="avatar"
-            />
-            vkhanhqui
-          </a>
-          <div class="links">
-            <a
-              class="footer-link"
-              href="https://github.com/vkhanhqui/figma-mcp-go/issues/new?labels=bug"
-              target="_blank"
-              title="Report a bug"
+            </TextField>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              class="size-5 shrink-0 font-mono text-positive hover:bg-accent hover:text-accent-foreground"
+              onClick={applySettings}
+              title="Apply"
             >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812.772-1.932-2.8-1.872ZM6.272 3.937 3.5 5.808l.772 1.932L6.3 6.928V3.873a.75.75 0 0 0-.028.064ZM8.75 9.75H7.25V11h1.5V9.75Zm0-5.5H7.25v4h1.5v-4Z"/>
-              </svg>
-              Bug
-            </a>
-            <a
-              class="footer-link"
-              href="https://github.com/vkhanhqui/figma-mcp-go/issues/new?labels=enhancement&title=Feature+request%3A+"
-              target="_blank"
-              title="Suggest a feature"
+              ✓
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              class="size-5 shrink-0 font-mono text-destructive hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setShowSettings(false)}
+              title="Cancel"
             >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 14.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/>
-              </svg>
-              Suggest
-            </a>
+              ✕
+            </Button>
           </div>
-        </div>
+        </Show>
       </div>
     </div>
   );

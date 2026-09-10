@@ -11,12 +11,19 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "solid-js": "^1"
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@kobalte/core": "^0.13.14",
+    "cva": "1.0.0-beta.4",
+    "solid-js": "^1",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.4.2",
     "concurrently": "^9",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7",
     "vite": "^7",
     "vite-plugin-singlefile": "^2",
