@@ -1125,6 +1125,44 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
                 }
             }
         }
+        "create_stickies" => {
+            if !params.get("items").map_or(false, |v| v.is_array() && v.as_array().map_or(false, |a| !a.is_empty())) {
+                return Some("items must be a non-empty array".into());
+            }
+            if let Some(items) = params.get("items").and_then(|v| v.as_array()) {
+                if items.len() > 200 {
+                    return Some("items supports at most 200 stickies per call".into());
+                }
+            }
+        }
+
+        "create_table" => {
+            let rows = params.get("rows").and_then(|v| v.as_f64());
+            let cols = params.get("columns").and_then(|v| v.as_f64());
+            if rows.is_none() || cols.is_none() {
+                return Some("rows and columns are required".into());
+            }
+            if let (Some(r), Some(c)) = (rows, cols) {
+                if !(1.0..=50.0).contains(&r) || !(1.0..=50.0).contains(&c) {
+                    return Some("rows and columns must be between 1 and 50".into());
+                }
+            }
+        }
+
+        "create_code_block" => {
+            if str_param(params, "code").unwrap_or("").is_empty() {
+                return Some("code is required".into());
+            }
+        }
+
+        "auto_arrange" => {
+            if let Some(layout) = str_param(params, "layout") {
+                if !["grid", "row", "column"].contains(&layout) {
+                    return Some("layout must be one of: grid, row, column".into());
+                }
+            }
+        }
+
 
         "use_figma" => {
             if str_param(params, "code").unwrap_or("").trim().is_empty() {

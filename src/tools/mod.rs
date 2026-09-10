@@ -490,6 +490,36 @@ impl FigmaServer {
     async fn create_connector(&self, Parameters(args): Parameters<figjam::CreateConnectorArgs>) -> Result<CallToolResult, McpError> {
         figjam::create_connector(std::sync::Arc::clone(&self.node), args).await
     }
+    #[tool(description = "Create multiple sticky notes at once on a FigJam board, with optional grid auto-layout. FigJam only.")]
+    async fn create_stickies(&self, Parameters(args): Parameters<figjam::CreateStickiesArgs>) -> Result<CallToolResult, McpError> {
+        figjam::create_stickies(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(description = "Create a shape with text on a FigJam board (rectangles, circles, diamonds, etc.). FigJam only.")]
+    async fn create_shape_with_text(&self, Parameters(args): Parameters<figjam::CreateShapeWithTextArgs>) -> Result<CallToolResult, McpError> {
+        figjam::create_shape_with_text(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(description = "Create a table on a FigJam board with optional cell text content. FigJam only.")]
+    async fn create_table(&self, Parameters(args): Parameters<figjam::CreateTableArgs>) -> Result<CallToolResult, McpError> {
+        figjam::create_table(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(description = "Create a code block on a FigJam board with syntax highlighting. FigJam only.")]
+    async fn create_code_block(&self, Parameters(args): Parameters<figjam::CreateCodeBlockArgs>) -> Result<CallToolResult, McpError> {
+        figjam::create_code_block(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(description = "Auto-arrange objects on a FigJam board in grid, row, or column layout. FigJam only.")]
+    async fn auto_arrange(&self, Parameters(args): Parameters<figjam::AutoArrangeArgs>) -> Result<CallToolResult, McpError> {
+        figjam::auto_arrange(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(description = "Get all objects and connectors on the current FigJam page. Returns nodes with text content and connection data. FigJam only.")]
+    async fn get_board_contents(&self, Parameters(args): Parameters<figjam::GetBoardContentsArgs>) -> Result<CallToolResult, McpError> {
+        figjam::get_board_contents(std::sync::Arc::clone(&self.node), args).await
+    }
+
 
     // ── Escape hatch ─────────────────────────────────────────────────────────
     #[tool(description = r##"Run JavaScript against the Figma Plugin API inside the file. Use this for anything the named tools don't cover: FigJam tables/shapes/code blocks/labels, Slides, component variants and properties, vector networks, styled text ranges, variable scopes, library imports, bulk edits in one round-trip.

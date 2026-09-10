@@ -1,6 +1,7 @@
 // Plugin core — entry point, UI bootstrap, and request dispatch.
 
 import { handleExecuteRequest } from "./execute";
+import { handleFigjamToolRequest } from "./figjam-tools";
 import { handleReadRequest } from "./read-handlers";
 import { handleWriteRequest } from "./write-handlers";
 
@@ -18,6 +19,7 @@ const handleRequest = async (request: unknown) => {
   try {
     const result =
       (await handleExecuteRequest(request as any)) ??
+      (await handleFigjamToolRequest(request as any)) ??
       (await handleReadRequest(request as any)) ??
       (await handleWriteRequest(request as any));
 
