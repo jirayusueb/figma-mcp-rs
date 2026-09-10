@@ -225,6 +225,11 @@ impl Bridge {
         }
         eprintln!("[bridge] closed");
     }
+    /// Check if a plugin is currently connected.
+    pub fn connected(&self) -> bool {
+        self.writer.lock().is_some()
+    }
+
 
     fn next_id(&self) -> String {
         let n = self.counter.fetch_add(1, Ordering::Relaxed) + 1;

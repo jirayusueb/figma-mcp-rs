@@ -73,6 +73,7 @@ async fn handle_ping(State(leader): State<Arc<Leader>>) -> Json<serde_json::Valu
     Json(serde_json::json!({
         "status": "ok",
         "version": leader.version,
+        "pluginConnected": leader.bridge.connected(),
     }))
 }
 

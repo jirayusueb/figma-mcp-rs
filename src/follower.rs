@@ -93,4 +93,22 @@ impl Follower {
             _ => false,
         }
     }
+    /// Get the leader's status, including pluginConnected. Returns None on any failure.
+    pub async fn ping_status(&self) -> Option<Value> {
+        let req = hyper::Request::builder()
+            .method(hyper::Method::GET)
+            .uri(format!("{}/ping", self.leader_url))
+            .body(Full::<Bytes>::default())
+            .ok()?;
+        let resp = tokio::time::timeout(PING_TIMEOUT, self.client.request(req))
+            .await
+            .ok()?
+            .ok()?;
+        if resp.status() != hyper::StatusCode::OK {
+            return None;
+        }
+        let (_, body) = resp.into_parts();
+        let bytes = body.collect().await.ok()?.to_bytes();
+        serde_json::from_slice(&bytes).ok()
+    }
 }

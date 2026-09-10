@@ -3,6 +3,7 @@ mod election;
 mod follower;
 mod leader;
 mod node;
+mod plugin_assets;
 mod prompts;
 mod schema;
 mod tools;
@@ -45,6 +46,12 @@ async fn main() -> anyhow::Result<()> {
             "WARNING: binding to {ip} — server will be reachable from the network with no authentication"
         );
     }
+    // Install plugin assets to ~/.figma-mcp-rs/plugin/
+    match plugin_assets::install() {
+        Ok(p) => eprintln!("[plugin] assets ready: {}", p.display()),
+        Err(e) => eprintln!("[plugin] could not install plugin assets: {e}"),
+    }
+
 
     let node = Arc::new(node::Node::new(&ip, port, version));
     let election = Arc::new(election::Election::new(Arc::clone(&node), &ip, port));

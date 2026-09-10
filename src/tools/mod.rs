@@ -8,6 +8,7 @@ pub mod figjam;
 pub mod read_document;
 pub mod read_export;
 pub mod read_styles;
+pub mod status;
 pub mod use_figma;
 pub mod write_components;
 pub mod write_create;
@@ -103,6 +104,11 @@ fn render(resp: Result<BridgeResponse, String>) -> Result<CallToolResult, McpErr
 
 #[tool_router]
 impl FigmaServer {
+    #[tool(description = r##"Check whether the Figma plugin bridge is connected and get setup instructions when it is not. Call this first if any tool fails with 'plugin not connected'. Does not touch the Figma document."##)]
+    async fn get_status(&self) -> Result<CallToolResult, McpError> {
+        status::get_status(std::sync::Arc::clone(&self.node)).await
+    }
+
     #[tool(description = r##"Get the full node tree of the current page (not the whole file — only the active page). Returns all nodes recursively and can be very large. Prefer get_design_context for exploration or when token efficiency matters."##)]
     async fn get_document(&self) -> Result<CallToolResult, McpError> {
         read_document::get_document(std::sync::Arc::clone(&self.node)).await

@@ -1,6 +1,6 @@
 .PHONY: build build-rs build-ts test test-rs test-ts clean release
 
-build: build-rs build-ts
+build: build-ts build-rs
 
 build-rs:
 	cargo build --release

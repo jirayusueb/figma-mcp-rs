@@ -21,6 +21,8 @@ jobs:
           bun install --frozen-lockfile
           bun test
           bun run build
+      - name: Fail if committed plugin/dist is stale
+        run: git diff --exit-code plugin/dist
       - name: Zip plugin
         run: |
           mkdir -p dist-artifact

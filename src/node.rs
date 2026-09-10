@@ -116,4 +116,44 @@ impl Node {
         }
         s.role = Role::Unknown;
     }
+    /// Get the current status including role, connectivity, and address.
+    pub async fn status(&self) -> serde_json::Value {
+        let (role, leader) = {
+            let s = self.state.read();
+            (s.role, s.leader.clone())
+        };
+
+        if role == Role::Leader {
+            if let Some(leader) = leader {
+                return serde_json::json!({
+                    "role": "LEADER",
+                    "address": format!("{}:{}", self.ip, self.port),
+                    "version": self.version,
+                    "pluginConnected": leader.bridge.connected(),
+                });
+            }
+        }
+
+        // Follower: try to get status from leader.
+        let ping_status = self.follower.ping_status().await;
+        if let Some(status) = ping_status {
+            let plugin_connected = status.get("pluginConnected");
+            return serde_json::json!({
+                "role": "FOLLOWER",
+                "address": format!("{}:{}", self.ip, self.port),
+                "version": self.version,
+                "leaderReachable": true,
+                "pluginConnected": plugin_connected,
+            });
+        }
+
+        // Leader unreachable.
+        serde_json::json!({
+            "role": "FOLLOWER",
+            "address": format!("{}:{}", self.ip, self.port),
+            "version": self.version,
+            "leaderReachable": false,
+            "pluginConnected": serde_json::Value::Null,
+        })
+    }
 }
