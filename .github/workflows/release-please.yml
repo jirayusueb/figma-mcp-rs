@@ -17,13 +17,13 @@ permissions:
 
 jobs:
   release-please:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        if: github.event_name == 'push'
         id: rp
         with:
           config-file: .release-please-config.json
