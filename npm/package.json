@@ -1,6 +1,6 @@
 {
   "name": "figma-mcp-rs",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A zero-cost, unlimited Figma/FigJam MCP server in Rust — no API key, no rate limits",
   "bin": {
     "figma-mcp-rs": "bin/run.js"
