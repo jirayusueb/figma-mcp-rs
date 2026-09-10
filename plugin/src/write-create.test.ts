@@ -6,6 +6,7 @@ import { handleWriteCreateRequest } from "./write-create";
 let mockNodes: Record<string, any>;
 let commitUndoCalled: boolean;
 let createdComponents: any[];
+let createdFrames: { sizingHorizontal: string; appended: boolean }[];
 
 const makeRequest = (type: string, nodeIds?: string[], params?: any) => ({
   type,
@@ -17,6 +18,7 @@ const makeRequest = (type: string, nodeIds?: string[], params?: any) => ({
 beforeEach(() => {
   commitUndoCalled = false;
   createdComponents = [];
+  createdFrames = [];
   mockNodes = {};
   (globalThis as any).figma = {
     get currentPage() { return { id: "0:1", name: "Page 1", appendChild: () => {} }; },
@@ -34,6 +36,25 @@ beforeEach(() => {
       };
       createdComponents.push(comp);
       return comp;
+    },
+    createFrame: () => {
+      const frame = {
+        id: "frame:new", name: "Frame", type: "FRAME",
+        x: 0, y: 0, width: 100, height: 100,
+        fills: [] as unknown[],
+        layoutMode: "NONE",
+        appended: false,
+        sizingHorizontal: "FIXED",
+        resize(w: number, h: number) { this.width = w; this.height = h; },
+        get layoutSizingHorizontal() { return this.sizingHorizontal; },
+        set layoutSizingHorizontal(v: string) {
+          // Mirrors Figma: FILL is rejected until the node has an auto-layout parent.
+          if (!this.appended) throw new Error("FILL requires an auto-layout parent");
+          this.sizingHorizontal = v;
+        },
+      };
+      createdFrames.push(frame);
+      return frame;
     },
     commitUndo: () => { commitUndoCalled = true; },
     mixed: Symbol("mixed"),
@@ -117,6 +138,10 @@ describe("create_component", () => {
       itemSpacing: 12,
       primaryAxisAlignItems: "CENTER",
       counterAxisAlignItems: "CENTER",
+      primaryAxisSizingMode: "AUTO",
+      counterAxisSizingMode: "FIXED",
+      layoutWrap: "WRAP",
+      counterAxisSpacing: 4,
       children: [], parent,
       remove() {},
     };
@@ -130,6 +155,10 @@ describe("create_component", () => {
     expect(comp.paddingRight).toBe(16);
     expect(comp.itemSpacing).toBe(12);
     expect(comp.primaryAxisAlignItems).toBe("CENTER");
+    expect(comp.primaryAxisSizingMode).toBe("AUTO");
+    expect(comp.counterAxisSizingMode).toBe("FIXED");
+    expect(comp.layoutWrap).toBe("WRAP");
+    expect(comp.counterAxisSpacing).toBe(4);
   });
 
   it("throws when nodeId not found", async () => {
@@ -149,6 +178,28 @@ describe("create_component", () => {
     await expect(
       handleWriteCreateRequest(makeRequest("create_component", []))
     ).rejects.toThrow("nodeId is required");
+  });
+});
+
+// ── create_frame ──────────────────────────────────────────────────────────────
+
+describe("create_frame", () => {
+  it("applies FILL sizing after the frame is appended to its parent", async () => {
+    mockNodes["0:2"] = {
+      id: "0:2",
+      layoutMode: "VERTICAL",
+      appendChild(child) { child.appended = true; },
+    };
+
+    const res = await handleWriteCreateRequest(makeRequest("create_frame", [], {
+      parentId: "0:2",
+      name: "Fill",
+      height: 40,
+      layoutSizingHorizontal: "FILL",
+    }));
+    expect(res?.data.name).toBe("Fill");
+    expect(createdFrames[0].sizingHorizontal).toBe("FILL");
+    expect(commitUndoCalled).toBe(true);
   });
 });
 

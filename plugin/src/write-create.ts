@@ -1,5 +1,5 @@
 import { getBounds } from "./serializers";
-import { makeSolidPaint, getParentNode, base64ToBytes, applyAutoLayout } from "./write-helpers";
+import { makeSolidPaint, getParentNode, base64ToBytes, applyAutoLayout, applyLayoutSizing } from "./write-helpers";
 import { isFigjam, assertNotFigjam } from "./figjam";
 
 export const handleWriteCreateRequest = async (request: any) => {
@@ -13,8 +13,10 @@ export const handleWriteCreateRequest = async (request: any) => {
       frame.y = p.y != null ? p.y : 0;
       if (p.name) frame.name = p.name;
       if (p.fillColor) frame.fills = [makeSolidPaint(p.fillColor)];
-      applyAutoLayout(frame, p);
       (parent as any).appendChild(frame);
+      // Layout after append: FILL/HUG are only valid once the node has its final parent.
+      applyAutoLayout(frame, p);
+      applyLayoutSizing(frame, p);
       figma.commitUndo();
       return {
         type: request.type,
@@ -127,14 +129,8 @@ export const handleWriteCreateRequest = async (request: any) => {
         component.cornerRadius = node.cornerRadius as number;
       }
       if (node.layoutMode && node.layoutMode !== "NONE") {
-        component.layoutMode = node.layoutMode;
-        component.paddingTop = node.paddingTop;
-        component.paddingRight = node.paddingRight;
-        component.paddingBottom = node.paddingBottom;
-        component.paddingLeft = node.paddingLeft;
-        component.itemSpacing = node.itemSpacing;
-        component.primaryAxisAlignItems = node.primaryAxisAlignItems;
-        component.counterAxisAlignItems = node.counterAxisAlignItems;
+        // Figma's property names match applyAutoLayout's params, so the source node is the param bag.
+        applyAutoLayout(component, node);
       }
       // Move children from frame into component
       for (const child of [...node.children]) {

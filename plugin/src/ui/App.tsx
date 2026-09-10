@@ -33,6 +33,7 @@ export default function App() {
     // new reference and silently break the connection.
     if (socket) {
       socket.onclose = null;
+      socket.onerror = null;
       socket.close();
     }
     const ws = new WebSocket(`ws://${serverHost()}:${serverPort()}/ws`);
@@ -43,22 +44,23 @@ export default function App() {
       parent.postMessage({ pluginMessage: { type: "ui-ready" } }, "*");
     };
 
-    ws.onclose = () => {
-      if (socket !== ws) return; // stale handler — a newer connect() already took over
+    // Both close and error must arm the retry: a refused connection in Figma's
+    // sandbox can fire onerror alone, and scheduling only from onclose leaves
+    // the panel dead until the plugin is re-run.
+    const scheduleReconnect = () => {
+      if (socket !== ws) return; // stale handler — a newer connect() took over
       setConnected(false);
       socket = null;
       setActiveCount(0);
-      if (reconnectTimer === undefined) {
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = undefined;
-          connect();
-        }, RECONNECT_DELAY_MS);
-      }
+      if (reconnectTimer !== undefined) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = undefined;
+        connect();
+      }, RECONNECT_DELAY_MS);
     };
 
-    ws.onerror = () => {
-      setConnected(false);
-    };
+    ws.onclose = scheduleReconnect;
+    ws.onerror = scheduleReconnect;
 
     ws.onmessage = (event) => {
       try {

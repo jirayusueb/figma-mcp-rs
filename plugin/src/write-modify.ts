@@ -1,5 +1,5 @@
 import { getBounds } from "./serializers";
-import { makeSolidPaint, getParentNode, applyAutoLayout } from "./write-helpers";
+import { makeSolidPaint, getParentNode, applyAutoLayout, applyLayoutSizing } from "./write-helpers";
 import { assertNotFigjam } from "./figjam";
 
 export const handleWriteModifyRequest = async (request: any) => {
@@ -186,18 +186,39 @@ export const handleWriteModifyRequest = async (request: any) => {
     case "set_auto_layout": {
       const p = request.params || {};
       assertNotFigjam("set_auto_layout");
-      const nodeId = request.nodeIds && request.nodeIds[0];
-      if (!nodeId) throw new Error("nodeId is required");
-      const node = await figma.getNodeByIdAsync(nodeId);
-      if (!node) throw new Error(`Node not found: ${nodeId}`);
-      if (node.type !== "FRAME") throw new Error(`Node ${nodeId} is not a FRAME`);
-      applyAutoLayout(node, p);
+      const nodeIds = request.nodeIds || [];
+      if (nodeIds.length === 0) throw new Error("nodeIds is required");
+      const results: Record<string, unknown>[] = [];
+      for (const nid of nodeIds) {
+        const n = await figma.getNodeByIdAsync(nid);
+        if (!n) { results.push({ nodeId: nid, error: "Node not found" }); continue; }
+        const isContainer = "layoutMode" in n;
+        const isChild = "layoutSizingHorizontal" in n;
+        if (!isContainer && !isChild) {
+          results.push({ nodeId: nid, error: `Node ${nid} does not support auto layout` });
+          continue;
+        }
+        if (!isContainer && p.layoutMode != null) {
+          results.push({
+            nodeId: nid,
+            error: "Node does not support auto layout — only frames, components and instances have layoutMode",
+          });
+          continue;
+        }
+        try {
+          if (isContainer) applyAutoLayout(n, p);
+          if (isChild) applyLayoutSizing(n, p);
+          const entry: Record<string, unknown> = { nodeId: nid, name: n.name };
+          if (isContainer) entry.layoutMode = n.layoutMode;
+          if (isChild && p.layoutSizingHorizontal) entry.layoutSizingHorizontal = n.layoutSizingHorizontal;
+          if (isChild && p.layoutSizingVertical) entry.layoutSizingVertical = n.layoutSizingVertical;
+          results.push(entry);
+        } catch (e) {
+          results.push({ nodeId: nid, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
       figma.commitUndo();
-      return {
-        type: request.type,
-        requestId: request.requestId,
-        data: { id: node.id, name: node.name },
-      };
+      return { type: request.type, requestId: request.requestId, data: { results } };
     }
 
     case "set_visible": {

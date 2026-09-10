@@ -115,6 +115,88 @@ describe("set_corner_radius", () => {
   });
 });
 
+// ── set_auto_layout ───────────────────────────────────────────────────────────
+
+describe("set_auto_layout", () => {
+  const makeFrameNode = (id: string) => ({
+    id,
+    name: "Frame",
+    layoutMode: "NONE",
+    layoutWrap: "NO_WRAP",
+    layoutSizingHorizontal: "FIXED",
+    layoutSizingVertical: "FIXED",
+    layoutPositioning: "AUTO",
+  });
+
+  it("applies container properties", async () => {
+    mockNodes["1:1"] = makeFrameNode("1:1");
+    const res = await handleWriteModifyRequest(makeRequest("set_auto_layout", ["1:1"], {
+      layoutMode: "HORIZONTAL",
+      itemSpacing: 8,
+      primaryAxisAlignItems: "CENTER",
+    }));
+    expect(res?.data.results[0].layoutMode).toBe("HORIZONTAL");
+    expect(mockNodes["1:1"].itemSpacing).toBe(8);
+    expect(mockNodes["1:1"].primaryAxisAlignItems).toBe("CENTER");
+    expect(commitUndoCalled).toBe(true);
+  });
+
+  it("applies sizing to a non-container child", async () => {
+    mockNodes["1:1"] = {
+      id: "1:1", name: "Rect",
+      layoutSizingHorizontal: "FIXED", layoutSizingVertical: "FIXED", layoutPositioning: "AUTO",
+    };
+    const res = await handleWriteModifyRequest(makeRequest("set_auto_layout", ["1:1"], {
+      layoutSizingHorizontal: "FILL",
+      layoutPositioning: "ABSOLUTE",
+    }));
+    expect(res?.data.results[0].layoutSizingHorizontal).toBe("FILL");
+    expect(mockNodes["1:1"].layoutPositioning).toBe("ABSOLUTE");
+  });
+
+  it("keeps applying siblings when one node rejects the sizing", async () => {
+    const failing = makeFrameNode("1:1");
+    const message = "Cannot set layoutSizingHorizontal to FILL on a node whose parent does not have auto-layout";
+    Object.defineProperty(failing, "layoutSizingHorizontal", {
+      get: () => "FIXED",
+      set: () => { throw new Error(message); },
+    });
+    mockNodes["1:1"] = failing;
+    mockNodes["2:2"] = makeFrameNode("2:2");
+
+    const res = await handleWriteModifyRequest(
+      makeRequest("set_auto_layout", ["1:1", "2:2"], { layoutSizingHorizontal: "FILL" })
+    );
+    expect(res?.data.results[0].error).toBe(message);
+    expect(res?.data.results[1].layoutSizingHorizontal).toBe("FILL");
+    expect(mockNodes["2:2"].layoutSizingHorizontal).toBe("FILL");
+  });
+
+  it("reports error when layoutMode is requested on a node without it", async () => {
+    mockNodes["1:1"] = {
+      id: "1:1", name: "Rect",
+      layoutSizingHorizontal: "FIXED", layoutSizingVertical: "FIXED", layoutPositioning: "AUTO",
+    };
+    const res = await handleWriteModifyRequest(
+      makeRequest("set_auto_layout", ["1:1"], { layoutMode: "VERTICAL" })
+    );
+    expect(res?.data.results[0].error).toContain("does not support auto layout");
+  });
+
+  it("reports error for missing node", async () => {
+    const res = await handleWriteModifyRequest(
+      makeRequest("set_auto_layout", ["9:9"], { layoutMode: "VERTICAL" })
+    );
+    expect(res?.data.results[0].error).toBe("Node not found");
+  });
+
+  it("throws for empty nodeIds", async () => {
+    await expect(
+      handleWriteModifyRequest(makeRequest("set_auto_layout", [], { layoutMode: "VERTICAL" }))
+    ).rejects.toThrow("nodeIds is required");
+  });
+});
+
 // ── set_visible ───────────────────────────────────────────────────────────────
 
 describe("set_visible", () => {

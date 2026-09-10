@@ -2,3 +2,6 @@
 /plugin/node_modules
 .DS_Store
 .impeccable/
+
+# local MCP client config (absolute paths, machine-specific)
+.mcp.json
