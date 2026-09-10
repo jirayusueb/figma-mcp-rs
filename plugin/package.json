@@ -1,0 +1,25 @@
+{
+  "name": "figma-mcp-rs-plugin",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "dev": "concurrently \"vite build --watch\" \"vite build --watch -c vite.config.main.ts\"",
+    "build": "vite build && vite build -c vite.config.main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "dependencies": {
+    "solid-js": "^1"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1",
+    "@types/bun": "^1.4.2",
+    "concurrently": "^9",
+    "typescript": "^7",
+    "vite": "^7",
+    "vite-plugin-singlefile": "^2",
+    "vite-plugin-solid": "^1"
+  }
+}

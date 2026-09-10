@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jirayu/figma-mcp-rs",
+  "description": "Figma/FigJam MCP server with full read/write access via plugin — no API token, no rate limits. 75 tools.",
+  "repository": {
+    "url": "https://github.com/jirayu/figma-mcp-rs",
+    "source": "github"
+  },
+  "version": "0.1.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "figma-mcp-rs",
+      "version": "0.1.3",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

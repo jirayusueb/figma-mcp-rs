@@ -1,0 +1,14 @@
+{
+  "name": "figma-mcp-rs",
+  "owner": {
+    "name": "Jirayu"
+  },
+  "plugins": [
+    {
+      "name": "figma-mcp-rs",
+      "source": "./",
+      "description": "Figma + FigJam MCP server in Rust: plugin bridge, no API token, no rate limits. 75 tools, 13 skills.",
+      "category": "design"
+    }
+  ]
+}

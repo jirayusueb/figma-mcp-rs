@@ -1,0 +1,309 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": [],
+  "name": "figma-mcp-rs",
+  "description": "Figma + FigJam MCP server with full read/write access via a plugin bridge. No API token, no REST rate limits. 75 tools and 12 prompts, written in Rust. Port of vkhanhqui/figma-mcp-go.",
+  "license": "MIT",
+  "tools": [
+    {
+      "name": "add_page",
+      "description": "Add a new page to the Figma document"
+    },
+    {
+      "name": "add_variable_mode",
+      "description": ""
+    },
+    {
+      "name": "apply_style_to_node",
+      "description": "Apply an existing local style (paint, text, effect, or grid) to a node, linking the node to that style"
+    },
+    {
+      "name": "batch_rename_nodes",
+      "description": "Rename multiple nodes using find/replace, regex substitution, or prefix/suffix addition"
+    },
+    {
+      "name": "bind_variable_to_node",
+      "description": "Bind a local variable to a node property so the property is driven by the variable's value"
+    },
+    {
+      "name": "clone_node",
+      "description": "Clone an existing node, optionally repositioning it or placing it in a new parent"
+    },
+    {
+      "name": "create_component",
+      "description": "Convert an existing FRAME node into a reusable COMPONENT"
+    },
+    {
+      "name": "create_connector",
+      "description": "Create a connector on the current FigJam page, optionally linked between two nodes"
+    },
+    {
+      "name": "create_effect_style",
+      "description": "Create a new local effect style (drop shadow, inner shadow, or blur)"
+    },
+    {
+      "name": "create_ellipse",
+      "description": "Create a new ellipse (circle/oval) on the current page or inside a parent node"
+    },
+    {
+      "name": "create_frame",
+      "description": "Create a new frame on the current page or inside a parent node"
+    },
+    {
+      "name": "create_grid_style",
+      "description": "Create a new local layout grid style"
+    },
+    {
+      "name": "create_paint_style",
+      "description": "Create a new local paint style with a solid fill color"
+    },
+    {
+      "name": "create_rectangle",
+      "description": "Create a new rectangle on the current page or inside a parent node"
+    },
+    {
+      "name": "create_section",
+      "description": "Create a Figma Section node on the current page"
+    },
+    {
+      "name": "create_sticky",
+      "description": "Create a sticky note on the current FigJam page"
+    },
+    {
+      "name": "create_text",
+      "description": "Create a new text node on the current page or inside a parent node"
+    },
+    {
+      "name": "create_text_style",
+      "description": "Create a new local text style (typography preset)"
+    },
+    {
+      "name": "create_variable",
+      "description": "Create a new variable (design token) inside an existing collection"
+    },
+    {
+      "name": "create_variable_collection",
+      "description": ""
+    },
+    {
+      "name": "delete_nodes",
+      "description": "Delete one or more nodes"
+    },
+    {
+      "name": "delete_page",
+      "description": "Delete a page from the Figma document"
+    },
+    {
+      "name": "delete_style",
+      "description": "Delete a style (paint, text, effect, or grid) by its ID"
+    },
+    {
+      "name": "delete_variable",
+      "description": "Delete a single variable (provide variableId) or an entire collection and all its variables (provide collectionId)"
+    },
+    {
+      "name": "detach_instance",
+      "description": "Detach one or more component instances, converting them to plain frames"
+    },
+    {
+      "name": "export_frames_to_pdf",
+      "description": "Export multiple frames as a single multi-page PDF file"
+    },
+    {
+      "name": "export_tokens",
+      "description": "Export all design tokens (variables and paint styles) as JSON or CSS custom properties"
+    },
+    {
+      "name": "find_replace_text",
+      "description": "Find and replace text content across all TEXT nodes in a subtree"
+    },
+    {
+      "name": "get_annotations",
+      "description": "Get dev-mode annotations in the current document or scoped to a specific node"
+    },
+    {
+      "name": "get_design_context",
+      "description": "Get a depth-limited, token-efficient tree of the current selection or page"
+    },
+    {
+      "name": "get_document",
+      "description": "Get the full node tree of the current page (not the whole file — only the active page)"
+    },
+    {
+      "name": "get_fonts",
+      "description": "List all fonts used in the current page, sorted by usage frequency"
+    },
+    {
+      "name": "get_local_components",
+      "description": "Get all components defined in the current Figma file"
+    },
+    {
+      "name": "get_metadata",
+      "description": "Get metadata about the current Figma document: file name, pages, current page"
+    },
+    {
+      "name": "get_node",
+      "description": "Get a single node by ID with full detail"
+    },
+    {
+      "name": "get_nodes_info",
+      "description": "Get full details for multiple nodes by ID in one round-trip"
+    },
+    {
+      "name": "get_pages",
+      "description": "List all pages in the document with their IDs and names"
+    },
+    {
+      "name": "get_reactions",
+      "description": "Get the prototype reactions defined on a node"
+    },
+    {
+      "name": "get_screenshot",
+      "description": "Export a screenshot of one or more nodes as base64-encoded image data (held in memory)"
+    },
+    {
+      "name": "get_selection",
+      "description": "Get the nodes currently selected in Figma"
+    },
+    {
+      "name": "get_styles",
+      "description": "Get all local styles in the document (paint, text, effect, and grid)"
+    },
+    {
+      "name": "get_variable_defs",
+      "description": "Get all local variable definitions: collections, modes, and values"
+    },
+    {
+      "name": "get_viewport",
+      "description": "Get the current Figma viewport: scroll center, zoom level, and visible bounds"
+    },
+    {
+      "name": "group_nodes",
+      "description": "Group two or more nodes into a GROUP"
+    },
+    {
+      "name": "import_image",
+      "description": "Import a base64-encoded image into Figma as a rectangle with an image fill"
+    },
+    {
+      "name": "lock_nodes",
+      "description": "Lock one or more nodes to prevent accidental edits in Figma"
+    },
+    {
+      "name": "move_nodes",
+      "description": "Move one or more nodes to an absolute canvas position"
+    },
+    {
+      "name": "navigate_to_page",
+      "description": "Switch the active Figma page"
+    },
+    {
+      "name": "remove_reactions",
+      "description": "Remove prototype reactions from a node"
+    },
+    {
+      "name": "rename_node",
+      "description": "Rename a single node by ID"
+    },
+    {
+      "name": "rename_page",
+      "description": "Rename an existing page in the Figma document"
+    },
+    {
+      "name": "reorder_nodes",
+      "description": "Change the z-order (layer stack position) of one or more nodes"
+    },
+    {
+      "name": "reparent_nodes",
+      "description": "Move one or more nodes to a different parent frame, group, or section"
+    },
+    {
+      "name": "resize_nodes",
+      "description": "Resize one or more nodes"
+    },
+    {
+      "name": "rotate_nodes",
+      "description": "Rotate one or more nodes to an absolute angle in degrees"
+    },
+    {
+      "name": "save_screenshots",
+      "description": "Export screenshots for multiple nodes and write them to the local filesystem"
+    },
+    {
+      "name": "scan_nodes_by_types",
+      "description": "Find all nodes of specific types in a subtree, regardless of name"
+    },
+    {
+      "name": "scan_text_nodes",
+      "description": "Scan all TEXT nodes in a subtree and return their content"
+    },
+    {
+      "name": "search_nodes",
+      "description": "Search for nodes by name substring and/or type within a subtree"
+    },
+    {
+      "name": "set_auto_layout",
+      "description": "Set or update auto-layout (flex) properties on an existing frame"
+    },
+    {
+      "name": "set_blend_mode",
+      "description": "Set the blend mode of one or more nodes (e.g"
+    },
+    {
+      "name": "set_constraints",
+      "description": "Set layout constraints (pinning behaviour) on one or more nodes relative to their parent"
+    },
+    {
+      "name": "set_corner_radius",
+      "description": "Set corner radius on one or more nodes"
+    },
+    {
+      "name": "set_effects",
+      "description": "Apply one or more effects (drop shadow, inner shadow, layer blur, background blur) directly to a node"
+    },
+    {
+      "name": "set_fills",
+      "description": "Set the fill color on a single node (takes one nodeId, not an array)"
+    },
+    {
+      "name": "set_opacity",
+      "description": "Set the opacity of one or more nodes (0 = fully transparent, 1 = fully opaque)"
+    },
+    {
+      "name": "set_reactions",
+      "description": ""
+    },
+    {
+      "name": "set_strokes",
+      "description": "Set the stroke color and weight on a single node (takes one nodeId, not an array)"
+    },
+    {
+      "name": "set_text",
+      "description": "Update the text content of an existing TEXT node"
+    },
+    {
+      "name": "set_variable_value",
+      "description": "Set a variable's value for a specific mode"
+    },
+    {
+      "name": "set_visible",
+      "description": "Show or hide one or more nodes by setting their visibility"
+    },
+    {
+      "name": "swap_component",
+      "description": "Swap the main component of an existing INSTANCE node, replacing it with a different component while keeping position and size"
+    },
+    {
+      "name": "ungroup_nodes",
+      "description": "Ungroup one or more GROUP nodes, moving their children to the parent and removing the group"
+    },
+    {
+      "name": "unlock_nodes",
+      "description": "Unlock one or more nodes, allowing them to be edited again"
+    },
+    {
+      "name": "update_paint_style",
+      "description": "Update an existing paint style's name, color, or description"
+    }
+  ]
+}

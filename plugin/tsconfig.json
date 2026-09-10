@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2019",
+      "DOM"
+    ],
+    "strict": false,
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": [
+      "@figma/plugin-typings",
+      "bun"
+    ],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src"
+  ]
+}
