@@ -1,5 +1,6 @@
 // Plugin core — entry point, UI bootstrap, and request dispatch.
 
+import { handleExecuteRequest } from "./execute";
 import { handleReadRequest } from "./read-handlers";
 import { handleWriteRequest } from "./write-handlers";
 
@@ -13,11 +14,13 @@ const sendStatus = () => {
     },
   });
 };
-
-const handleRequest = async (request: any) => {
+const handleRequest = async (request: unknown) => {
   try {
     const result =
-      (await handleReadRequest(request)) ?? (await handleWriteRequest(request));
+      (await handleExecuteRequest(request as any)) ??
+      (await handleReadRequest(request as any)) ??
+      (await handleWriteRequest(request as any));
+
     if (result === null)
       throw new Error(`Unknown request type: ${request.type}`);
     return result;

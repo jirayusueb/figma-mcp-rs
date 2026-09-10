@@ -1115,6 +1115,17 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
         }
 
+        "execute_code" => {
+            if str_param(params, "code").unwrap_or("").trim().is_empty() {
+                return Some("code is required".into());
+            }
+            if let Some(t) = params.get("timeoutMs").and_then(|v| v.as_f64()) {
+                if !(1.0..=25000.0).contains(&t) {
+                    return Some(format!("timeoutMs must be between 1 and 25000, got: {t}"));
+                }
+            }
+        }
+
         "use_figma" => {
             if str_param(params, "code").unwrap_or("").trim().is_empty() {
                 return Some("code is required".into());
@@ -1600,5 +1611,20 @@ mod tests {
         assert!(validate_rpc("use_figma", &[], &Value::Null).is_some());
         assert!(validate_rpc("use_figma", &[], &json!({"code": "   "})).is_some());
         assert!(validate_rpc("use_figma", &[], &json!({"code": "return 1"})).is_none());
+    }
+    #[test]
+    fn execute_code_requires_code() {
+        assert!(validate_rpc("execute_code", &[], &Value::Null).is_some());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "   "})).is_some());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1"})).is_none());
+    }
+
+    #[test]
+    fn execute_code_rejects_out_of_range_timeout() {
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 0})).is_some());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 25001})).is_some());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 1})).is_none());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 25000})).is_none());
+        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 5000})).is_none());
     }
 }

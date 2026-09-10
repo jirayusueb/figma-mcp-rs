@@ -4,6 +4,7 @@
 //! and handler fns; this file wires them into the rmcp tool router, mirroring
 //! the tool names/descriptions from figma-mcp-go's internal/tools_*.go verbatim.
 
+pub mod execute;
 pub mod figjam;
 pub mod read_document;
 pub mod read_export;
@@ -108,6 +109,11 @@ impl FigmaServer {
     async fn get_status(&self) -> Result<CallToolResult, McpError> {
         status::get_status(std::sync::Arc::clone(&self.node)).await
     }
+    #[tool(description = r##"Run arbitrary Figma Plugin API code inside the plugin sandbox and return its value. The code runs as an async function body — use await and end with a return. Use this only for operations the dedicated tools do not cover; prefer the specific tool when one exists. Runs in the user's open file and is undoable with Cmd/Ctrl+Z."##)]
+    async fn execute_code(&self, Parameters(args): Parameters<execute::ExecuteCodeArgs>) -> Result<CallToolResult, McpError> {
+        execute::execute_code(std::sync::Arc::clone(&self.node), args).await
+    }
+
 
     #[tool(description = r##"Get the full node tree of the current page (not the whole file — only the active page). Returns all nodes recursively and can be very large. Prefer get_design_context for exploration or when token efficiency matters."##)]
     async fn get_document(&self) -> Result<CallToolResult, McpError> {
