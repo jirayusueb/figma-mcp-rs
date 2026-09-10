@@ -153,10 +153,9 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           " "$VERSION"
       - name: Attach plugin.zip to the release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          files: artifacts/plugin/plugin.zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" artifacts/plugin/plugin.zip --clobber
       - name: Publish to npm
         working-directory: npm
         env:
