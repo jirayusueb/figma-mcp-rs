@@ -287,7 +287,7 @@ make build     # release binary + plugin dist
 ```
 
 - CI: fmt + clippy + tests (linux amd64/arm64, windows, macos) + plugin typecheck/test/build on every PR.
-- Releases: conventional commits (`feat:`, `fix:`) on main → release-please opens a version-bump PR (Cargo.toml, Cargo.lock, npm/package.json, CHANGELOG) → merging it tags, builds binaries + plugin.zip, publishes npm and the multi-arch image at `ghcr.io/jirayusueb/figma-mcp-rs`.
+- Releases: conventional commits (`feat:`, `fix:`) on main → release-please opens a version-bump PR (Cargo.toml, Cargo.lock, npm/package.json, CHANGELOG); merging it tags `vX.Y.Z` and the same workflow builds the five binaries + plugin.zip, publishes npm, and pushes the multi-arch image to `ghcr.io/jirayusueb/figma-mcp-rs`. Re-run a release build for an existing tag with `gh workflow run "Release please" -f tag=vX.Y.Z`.
 
 - Server: Rust (tokio, axum, rmcp). Plugin: TypeScript + SolidJS, built with Vite (UI inlined to `dist/index.html`, core IIFE `dist/code.js`).
 - Toolchain: Bun 1.4.2, TypeScript 7.
