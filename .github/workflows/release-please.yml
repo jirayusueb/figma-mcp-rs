@@ -136,6 +136,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: "{plugin,darwin-amd64,darwin-arm64,linux-amd64,linux-arm64,windows-amd64}"
       - name: Arrange npm package
         run: |
           VERSION="$(echo "$RELEASE_TAG" | sed -E 's/^[^0-9]*//')"
