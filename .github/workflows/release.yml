@@ -69,7 +69,7 @@ jobs:
       - name: Compute image tag
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
-        run: echo "IMAGE_TAG=${TAG_NAME#v}" >> "$GITHUB_ENV"
+        run: echo "IMAGE_TAG=$(echo "$TAG_NAME" | sed -E 's/^[^0-9]*//')" >> "$GITHUB_ENV"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -91,8 +91,7 @@ jobs:
           path: artifacts
       - name: Arrange npm package
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
-          VERSION="${VERSION#v}"
+          VERSION="$(echo "${{ github.event.release.tag_name }}" | sed -E 's/^[^0-9]*//')"
           for dir in darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64; do
             mkdir -p npm/bin/$dir
             cp artifacts/$dir/* npm/bin/$dir/
