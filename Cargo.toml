@@ -1,6 +1,6 @@
 [package]
 name = "figma-mcp-rs"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Figma MCP server in Rust — bridges MCP clients to Figma/FigJam via a plugin WebSocket"
 
