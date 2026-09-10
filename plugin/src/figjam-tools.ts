@@ -182,7 +182,7 @@ async function handleAutoArrange(request: any) {
     const skipped: string[] = [];
     for (const id of p.nodeIds) {
       const node = await figma.getNodeByIdAsync(id);
-      if (node) targets.push(node);
+      if (node) targets.push(node as SceneNode);
       else skipped.push(id);
     }
     if (!targets.length) throw new Error("no nodes to arrange");
@@ -233,7 +233,7 @@ function handleGetBoardContents(request: any) {
   const nodes = [];
   const connections = [];
 
-  const walk = (children: SceneNode[]) => {
+  const walk = (children: readonly SceneNode[]) => {
     for (const node of children) {
       const base = { id: node.id, name: node.name, type: node.type, bounds: getBounds(node) };
 

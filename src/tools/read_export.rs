@@ -652,7 +652,7 @@ mod tests {
 
     /// Builds a minimal single-page PDF (Catalog -> Pages -> Page) for merge testing.
     fn build_test_pdf() -> Vec<u8> {
-        use lopdf::{Document, Object, dictionary};
+        use lopdf::{dictionary, Document, Object};
 
         let mut doc = Document::with_version("1.5");
         let pages_id = doc.new_object_id();

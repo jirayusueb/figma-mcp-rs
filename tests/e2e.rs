@@ -6,9 +6,9 @@ use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use serde_json::{Value, json};
-use tokio_tungstenite::tungstenite::Message;
+use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::Message;
 
 /// Bind 127.0.0.1:0, return the port, drop the listener.
 fn free_port() -> u16 {

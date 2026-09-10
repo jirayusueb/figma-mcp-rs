@@ -2797,15 +2797,16 @@ ${code}
   };
   const handleRequest = (request2) => __async(null, null, function* () {
     var _a, _b, _c;
+    const req = request2;
     try {
       const result2 = (_c = (_b = (_a = yield handleExecuteRequest(request2)) != null ? _a : yield handleFigjamToolRequest(request2)) != null ? _b : yield handleReadRequest(request2)) != null ? _c : yield handleWriteRequest(request2);
       if (result2 === null)
-        throw new Error(`Unknown request type: ${request2.type}`);
+        throw new Error(`Unknown request type: ${req.type}`);
       return result2;
     } catch (error) {
       return {
-        type: request2.type,
-        requestId: request2.requestId,
+        type: req.type,
+        requestId: req.requestId,
         error: error instanceof Error ? error.message : String(error)
       };
     }

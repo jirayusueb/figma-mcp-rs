@@ -16,6 +16,7 @@ const sendStatus = () => {
   });
 };
 const handleRequest = async (request: unknown) => {
+  const req = request as { type?: string; requestId?: string };
   try {
     const result =
       (await handleExecuteRequest(request as any)) ??
@@ -24,12 +25,12 @@ const handleRequest = async (request: unknown) => {
       (await handleWriteRequest(request as any));
 
     if (result === null)
-      throw new Error(`Unknown request type: ${request.type}`);
+      throw new Error(`Unknown request type: ${req.type}`);
     return result;
   } catch (error) {
     return {
-      type: request.type,
-      requestId: request.requestId,
+      type: req.type,
+      requestId: req.requestId,
       error: error instanceof Error ? error.message : String(error),
     };
   }

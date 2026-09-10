@@ -4,8 +4,8 @@
 //! `#[prompt_handler]` impl in `src/tools/mod.rs` picks this up through the
 //! default `Self::prompt_router()` router expression.
 
-use rmcp::ErrorData as McpError;
 use rmcp::model::{GetPromptResult, PromptMessage, Role};
+use rmcp::ErrorData as McpError;
 use rmcp::{prompt, prompt_router};
 
 use crate::tools::FigmaServer;

@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo};
-use rmcp::{ErrorData, ServerHandler, prompt_handler, tool, tool_handler, tool_router};
+use rmcp::{prompt_handler, tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Serialize;
 
 use crate::node::Node;
