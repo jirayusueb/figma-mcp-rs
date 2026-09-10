@@ -66,15 +66,19 @@ Dark mode (add a "Dark" mode to the same collection):
 
 1. create_variable_collection(name="Primitives", modeName="Value")
 2. For each color in the scale: create_variable(type="COLOR", name="Primary/500", collectionId=...)
-   then set_variable_value(variableId, modeId, value="#hexcolor")
+   then set_variable_value(variableId, modeId, value="#hexcolor") — value also accepts
+   rgb(), hsl(), and oklch() notation, e.g. oklch(0.72 0.13 250)
 3. Repeat for secondary and neutrals.
 4. create_variable_collection(name="Semantic Colors", modeName="Light")
 5. add_variable_mode(collectionId, modeName="Dark") — if dark mode requested
-6. For each semantic alias: create_variable + set_variable_value for Light mode, then Dark mode.
+6. For each semantic alias: create_variable, then
+   set_variable_value(variableId=<semantic>, modeId=<Light mode>, aliasVariableId=<primitive>)
+   so the semantic token points at the primitive instead of copying its value. Repeat per mode.
 
 ## Rules
 - Always show the color table preview before executing creation.
 - Create Primitives collection first, Semantic collection second.
-- Use only hex values for variable colors.
-- Semantic variable values reference other variables conceptually — set the actual resolved hex value
-  since variable aliasing (variable-to-variable binding) is not yet supported via MCP.
+- Any of hex, rgb(), hsl(), or oklch() is accepted for variable colors — pass the notation the
+  palette was designed in; the plugin converts it.
+- Semantic variables must alias their primitive via aliasVariableId, not duplicate its resolved
+  value, so a primitive edit propagates.

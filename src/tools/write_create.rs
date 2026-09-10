@@ -74,6 +74,24 @@ pub(crate) struct CreateFrameArgs {
     /// Gap between wrapped rows/columns (only when layoutWrap is WRAP)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub counter_axis_spacing: Option<f64>,
+    /// Alignment of wrapped tracks: AUTO or SPACE_BETWEEN (only when layoutWrap is WRAP)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counter_axis_align_content: Option<String>,
+    /// Reverse child z-order so the first child renders on top
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_reverse_z_index: Option<bool>,
+    /// Include strokes in layout size calculations
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strokes_included_in_layout: Option<bool>,
+    /// Horizontal sizing: FIXED, HUG (auto-layout frames and text only), or FILL (only for a node inside an auto-layout parent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_sizing_horizontal: Option<String>,
+    /// Vertical sizing: FIXED, HUG (auto-layout frames and text only), or FILL (only for a node inside an auto-layout parent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_sizing_vertical: Option<String>,
+    /// AUTO to flow inside the parent's auto layout, ABSOLUTE to position freely inside it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_positioning: Option<String>,
     /// Parent node ID in colon format. Defaults to current page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,

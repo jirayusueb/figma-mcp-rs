@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { handleReadStyleRequest } from "./read-styles";
+import { clearVariableNameCache } from "./serializers";
 
 // ── Figma global mock ─────────────────────────────────────────────────────────
 
@@ -195,5 +196,179 @@ describe("export_tokens", () => {
     const res = await handleReadStyleRequest(makeRequest("export_tokens", { format: "json" }));
     // No _styles key since nothing was added
     expect(res?.data.tokens["_styles"]).toBeUndefined();
+  });
+});
+
+// ── get_styles ────────────────────────────────────────────────────────────────
+
+describe("get_styles", () => {
+  beforeEach(() => {
+    clearVariableNameCache();
+    (globalThis as any).figma.getLocalPaintStylesAsync = async () => [
+      {
+        id: "s:1",
+        name: "Brand/Primary",
+        description: "brand base",
+        remote: false,
+        key: "abc123",
+        paints: [{ type: "SOLID", color: { r: 1, g: 0, b: 0 }, opacity: 1 }],
+        boundVariables: { paints: [{ type: "VARIABLE_ALIAS", id: "v1" }] },
+      },
+    ];
+    (globalThis as any).figma.variables.getVariableByIdAsync = async (id: string) =>
+      id === "v1" ? { id, name: "color/primary" } : null;
+  });
+
+  it("emits hex colors by default", async () => {
+    const res = await handleReadStyleRequest(makeRequest("get_styles"));
+    expect(res?.data.paints[0].paints[0].color).toBe("#ff0000");
+  });
+
+  it("emits the requested color notation", async () => {
+    const res = await handleReadStyleRequest(makeRequest("get_styles", { colorFormat: "oklch" }));
+    expect(res?.data.paints[0].paints[0].color).toBe("oklch(0.6280 0.2577 29.23)");
+  });
+
+  it("reports publish metadata and bound variables", async () => {
+    const res = await handleReadStyleRequest(makeRequest("get_styles"));
+    const style = res?.data.paints[0];
+    expect(style.description).toBe("brand base");
+    expect(style.remote).toBe(false);
+    expect(style.key).toBe("abc123");
+    expect(style.boundVariables.paints[0].name).toBe("color/primary");
+  });
+
+  it("passes non-solid paints through untouched", async () => {
+    (globalThis as any).figma.getLocalPaintStylesAsync = async () => [
+      { id: "s:2", name: "Gradient", paints: [{ type: "GRADIENT_LINEAR", gradientStops: [] }] },
+    ];
+    const res = await handleReadStyleRequest(makeRequest("get_styles", { colorFormat: "hsl" }));
+    expect(res?.data.paints[0].paints[0]).toEqual({ type: "GRADIENT_LINEAR", gradientStops: [] });
+  });
+});
+
+// ── get_variable_defs ─────────────────────────────────────────────────────────
+
+describe("get_variable_defs", () => {
+  beforeEach(() => {
+    clearVariableNameCache();
+    (globalThis as any).figma.variables = {
+      getLocalVariableCollectionsAsync: async () => [
+        {
+          id: "col:1",
+          name: "Semantic",
+          defaultModeId: "m1",
+          remote: false,
+          hiddenFromPublishing: false,
+          key: "col-key",
+          modes: [{ modeId: "m1", name: "Light" }],
+          variableIds: ["var:1"],
+        },
+      ],
+      getVariableByIdAsync: async (id: string) =>
+        id === "var:1"
+          ? {
+              id: "var:1",
+              name: "color/primary",
+              resolvedType: "COLOR",
+              description: "semantic brand color",
+              scopes: ["ALL_FILLS"],
+              codeSyntax: { WEB: "--color-primary" },
+              hiddenFromPublishing: false,
+              remote: false,
+              key: "var-key",
+              variableCollectionId: "col:1",
+              valuesByMode: { m1: { type: "VARIABLE_ALIAS", id: "var:2" } },
+            }
+          : id === "var:2"
+            ? { id: "var:2", name: "primitives/blue-500" }
+            : null,
+    };
+  });
+
+  it("names the variable an alias points at", async () => {
+    const res = await handleReadStyleRequest(makeRequest("get_variable_defs"));
+    expect(res?.data.collections[0].variables[0].valuesByMode.m1).toEqual({
+      type: "VARIABLE_ALIAS",
+      id: "var:2",
+      name: "primitives/blue-500",
+    });
+  });
+
+  it("reports scopes, code syntax, and collection metadata", async () => {
+    const res = await handleReadStyleRequest(makeRequest("get_variable_defs"));
+    const collection = res?.data.collections[0];
+    expect(collection.defaultModeId).toBe("m1");
+    expect(collection.key).toBe("col-key");
+    expect(collection.variables[0].scopes).toEqual(["ALL_FILLS"]);
+    expect(collection.variables[0].codeSyntax).toEqual({ WEB: "--color-primary" });
+    expect(collection.variables[0].description).toBe("semantic brand color");
+  });
+});
+
+// ── export_tokens: aliases and color notation ─────────────────────────────────
+
+describe("export_tokens aliases", () => {
+  beforeEach(() => {
+    clearVariableNameCache();
+    (globalThis as any).figma.variables = {
+      getLocalVariableCollectionsAsync: async () => [
+        {
+          id: "col:1",
+          name: "Semantic",
+          modes: [{ modeId: "m1", name: "Light" }],
+          variableIds: ["var:1", "var:2"],
+        },
+      ],
+      getVariableByIdAsync: async (id: string) =>
+        id === "var:1"
+          ? {
+              id: "var:1",
+              name: "color/primary",
+              resolvedType: "COLOR",
+              valuesByMode: { m1: { type: "VARIABLE_ALIAS", id: "var:2" } },
+            }
+          : id === "var:2"
+            ? {
+                id: "var:2",
+                name: "primitives/blue-500",
+                resolvedType: "COLOR",
+                valuesByMode: { m1: { r: 1, g: 0, b: 0, a: 1 } },
+              }
+            : null,
+    };
+  });
+
+  it("emits var() references for aliases in CSS", async () => {
+    const res = await handleReadStyleRequest(makeRequest("export_tokens", { format: "css" }));
+    expect(res?.data.css).toContain("--color-primary: var(--primitives-blue-500);");
+    expect(res?.data.css).not.toContain("[object Object]");
+  });
+
+  it("emits the requested color notation in CSS", async () => {
+    const res = await handleReadStyleRequest(
+      makeRequest("export_tokens", { format: "css", colorFormat: "oklch" }),
+    );
+    expect(res?.data.css).toContain("--primitives-blue-500: oklch(0.6280 0.2577 29.23);");
+  });
+
+  it("names aliases in JSON output", async () => {
+    const res = await handleReadStyleRequest(makeRequest("export_tokens", { format: "json" }));
+    expect(res?.data.tokens.Semantic.color.primary.value.Light).toEqual({
+      type: "VARIABLE_ALIAS",
+      id: "var:2",
+      name: "primitives/blue-500",
+    });
+  });
+
+  it("keeps the float color object in JSON unless colorFormat is given", async () => {
+    const res = await handleReadStyleRequest(makeRequest("export_tokens", { format: "json" }));
+    expect(res?.data.tokens.Semantic.primitives["blue-500"].value.Light).toEqual({
+      type: "COLOR", r: 1, g: 0, b: 0, a: 1,
+    });
+    const formatted = await handleReadStyleRequest(
+      makeRequest("export_tokens", { format: "json", colorFormat: "hex" }),
+    );
+    expect(formatted?.data.tokens.Semantic.primitives["blue-500"].value.Light).toBe("#ff0000");
   });
 });

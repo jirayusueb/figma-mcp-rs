@@ -155,8 +155,8 @@ async fn e2e_full_stack() {
         .map(|t| t["name"].as_str().unwrap().to_string())
         .collect();
     assert!(
-        names.len() >= 76,
-        "expected >= 76 tools, got {}: {names:?}",
+        names.len() >= 79,
+        "expected >= 79 tools, got {}: {names:?}",
         names.len()
     );
     for expected in [
@@ -166,12 +166,20 @@ async fn e2e_full_stack() {
         "save_screenshots",
         "get_document",
         "use_figma",
+        "update_style",
+        "update_variable",
+        "set_variable_mode",
+        "bind_variable_to_style",
     ] {
         assert!(
             names.iter().any(|n| n == expected),
             "missing tool {expected}"
         );
     }
+    assert!(
+        !names.iter().any(|n| n == "update_paint_style"),
+        "update_paint_style was replaced by update_style"
+    );
 
     // Drive the call from this task: send JSON-RPC line, then pump plugin frames.
     let req = json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call",

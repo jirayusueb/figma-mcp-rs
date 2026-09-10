@@ -268,10 +268,13 @@ impl FigmaServer {
     }
 
     #[tool(
-        description = r##"Get all local styles in the document (paint, text, effect, and grid). Returns each style's ID, name, type, and properties. Use the style ID with apply_style_to_node or update_paint_style. For design tokens (variables), use get_variable_defs instead."##
+        description = r##"Get all local styles in the document (paint, text, effect, and grid). Returns each style's ID, name, type, and properties. Each style also reports description, publish state, bound variables, and colors in the notation you pass via colorFormat (hex, rgb, hsl, oklch). Use the style ID with apply_style_to_node or update_style. For design tokens (variables), use get_variable_defs instead."##
     )]
-    async fn get_styles(&self) -> Result<CallToolResult, McpError> {
-        read_styles::get_styles(std::sync::Arc::clone(&self.node)).await
+    async fn get_styles(
+        &self,
+        Parameters(args): Parameters<read_styles::GetStylesArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        read_styles::get_styles(std::sync::Arc::clone(&self.node), args).await
     }
 
     #[tool(
@@ -297,7 +300,7 @@ impl FigmaServer {
     }
 
     #[tool(
-        description = r##"Export all design tokens (variables and paint styles) as JSON or CSS custom properties. Ideal for bridging Figma variables into your codebase."##
+        description = r##"Export all design tokens (variables and paint styles) as JSON or CSS custom properties. Ideal for bridging Figma variables into your codebase. colorFormat picks the notation for exported colors: hex, rgb (default for css), hsl, or oklch."##
     )]
     async fn export_tokens(
         &self,
@@ -510,7 +513,9 @@ impl FigmaServer {
         write_modify::set_corner_radius(std::sync::Arc::clone(&self.node), args).await
     }
 
-    #[tool(description = r##"Set or update auto-layout (flex) properties on an existing frame."##)]
+    #[tool(
+        description = r##"Set auto-layout properties on one or more nodes. Container properties (layoutMode, padding, itemSpacing, alignment, wrap) apply to frames, components and instances. Sizing properties apply to the node itself: layoutSizingHorizontal/Vertical HUG needs the node to be an auto-layout frame or text, FILL needs the node to already sit inside an auto-layout parent, and layoutPositioning ABSOLUTE lifts a child out of the parent's flow. Figma only."##
+    )]
     async fn set_auto_layout(
         &self,
         Parameters(args): Parameters<write_modify::SetAutoLayoutArgs>,
@@ -662,7 +667,9 @@ impl FigmaServer {
         write_prototype::remove_reactions(std::sync::Arc::clone(&self.node), args).await
     }
 
-    #[tool(description = r##"Create a new local paint style with a solid fill color."##)]
+    #[tool(
+        description = r##"Create a new local paint style with a solid fill color (hex, rgb(), hsl(), or oklch())."##
+    )]
     async fn create_paint_style(
         &self,
         Parameters(args): Parameters<write_styles::CreatePaintStyleArgs>,
@@ -699,13 +706,13 @@ impl FigmaServer {
     }
 
     #[tool(
-        description = r##"Update an existing paint style's name, color, or description. Only paint styles support in-place updates — to modify text, effect, or grid styles, use delete_style and recreate them."##
+        description = r##"Update an existing style in place: paint (color), text (font, size, line height, letter spacing, decoration), effect (effects array), or grid (pattern, count, gutter, section size). Also renames and re-describes any style type. Pass only fields that apply to that style's type."##
     )]
-    async fn update_paint_style(
+    async fn update_style(
         &self,
-        Parameters(args): Parameters<write_styles::UpdatePaintStyleArgs>,
+        Parameters(args): Parameters<write_styles::UpdateStyleArgs>,
     ) -> Result<CallToolResult, McpError> {
-        write_styles::update_paint_style(std::sync::Arc::clone(&self.node), args).await
+        write_styles::update_style(std::sync::Arc::clone(&self.node), args).await
     }
 
     #[tool(description = r##"Delete a style (paint, text, effect, or grid) by its ID."##)]
@@ -737,7 +744,7 @@ impl FigmaServer {
     }
 
     #[tool(
-        description = r##"Bind a local variable to a node property so the property is driven by the variable's value. COLOR variables: use fillColor or strokeColor. BOOLEAN variables: use visible. FLOAT variables: use opacity, rotation, width, height, cornerRadius, topLeftRadius, topRightRadius, bottomLeftRadius, bottomRightRadius, strokeWeight, itemSpacing, paddingTop, paddingRight, paddingBottom, paddingLeft."##
+        description = r##"Bind a local variable to a node property so the property is driven by the variable's value. COLOR variables: use fillColor or strokeColor. BOOLEAN variables: use visible. FLOAT variables: use opacity, width, height, cornerRadius, topLeftRadius, topRightRadius, bottomLeftRadius, bottomRightRadius, strokeWeight, itemSpacing, paddingTop, paddingRight, paddingBottom, paddingLeft. Omit variableId to unbind the field. Binding fillColor/strokeColor rewrites only the first paint and leaves the rest of the array intact. Note — binding cornerRadius fans out to all four corner fields, so unbinding it requires one call per corner."##
     )]
     async fn bind_variable_to_node(
         &self,
@@ -746,7 +753,19 @@ impl FigmaServer {
         write_styles::bind_variable_to_node(std::sync::Arc::clone(&self.node), args).await
     }
 
-    #[tool(description = r##""##)]
+    #[tool(
+        description = r##"Bind a variable to a local style so the style itself is driven by a token: paint styles accept field 'color'; text styles accept fontFamily, fontSize, fontStyle, fontWeight, lineHeight, letterSpacing, paragraphSpacing, paragraphIndent; effect styles accept color, radius, spread, offsetX, offsetY; grid styles accept sectionSize, count, offset, gutterSize. Omit variableId to unbind."##
+    )]
+    async fn bind_variable_to_style(
+        &self,
+        Parameters(args): Parameters<write_styles::BindVariableToStyleArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        write_styles::bind_variable_to_style(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(
+        description = r##"Create a new local variable collection with an optional initial mode name. NOTE — Figma free plan limits each collection to 1 mode. If you need Light/Dark (or any multi-mode) theming and the user is on the free plan, do NOT try to call add_variable_mode; instead use the name-prefix workaround: create all variables in a single collection and prefix each variable name with its mode, e.g. 'light/color-bg' and 'dark/color-bg'. Inform the user of this limitation."##
+    )]
     async fn create_variable_collection(
         &self,
         Parameters(args): Parameters<write_variables::CreateVariableCollectionArgs>,
@@ -754,7 +773,9 @@ impl FigmaServer {
         write_variables::create_variable_collection(std::sync::Arc::clone(&self.node), args).await
     }
 
-    #[tool(description = r##""##)]
+    #[tool(
+        description = r##"Add a new mode to an existing variable collection (e.g. Light/Dark, Desktop/Mobile). IMPORTANT — Figma free plan only allows 1 mode per collection; calling this tool on a free-plan account will return the error 'Limited to 1 modes only'. If that error occurs, stop retrying and switch to the name-prefix workaround: keep the single default mode and create variables prefixed by mode, e.g. 'light/color-bg' and 'dark/color-bg' in the same collection. Tell the user that native multi-mode variables require a paid Figma plan (Professional or above)."##
+    )]
     async fn add_variable_mode(
         &self,
         Parameters(args): Parameters<write_variables::AddVariableModeArgs>,
@@ -772,7 +793,9 @@ impl FigmaServer {
         write_variables::create_variable(std::sync::Arc::clone(&self.node), args).await
     }
 
-    #[tool(description = r##"Set a variable's value for a specific mode."##)]
+    #[tool(
+        description = r##"Set a variable's value for a specific mode. Pass value for a literal (hex, rgb(), hsl(), or oklch() for COLOR), or aliasVariableId to point this variable at another variable (semantic token -> primitive)."##
+    )]
     async fn set_variable_value(
         &self,
         Parameters(args): Parameters<write_variables::SetVariableValueArgs>,
@@ -781,7 +804,27 @@ impl FigmaServer {
     }
 
     #[tool(
-        description = r##"Delete a single variable (provide variableId) or an entire collection and all its variables (provide collectionId). Provide exactly one of the two — not both."##
+        description = r##"Update an existing variable's name, description, scopes, code syntax, or publish visibility (pass variableId), or rename a collection / rename one of its modes (pass collectionId, plus modeId + modeName to rename a mode). Provide exactly one of variableId or collectionId."##
+    )]
+    async fn update_variable(
+        &self,
+        Parameters(args): Parameters<write_variables::UpdateVariableArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        write_variables::update_variable(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(
+        description = r##"Switch which mode of a variable collection applies to a node (or the whole current page when nodeId is omitted) — this is how you preview Light/Dark or Desktop/Mobile theming. Omit modeId to clear the override and inherit from the parent."##
+    )]
+    async fn set_variable_mode(
+        &self,
+        Parameters(args): Parameters<write_variables::SetVariableModeArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        write_variables::set_variable_mode(std::sync::Arc::clone(&self.node), args).await
+    }
+
+    #[tool(
+        description = r##"Delete a single variable (provide variableId) or an entire collection and all its variables (provide collectionId). Pass collectionId + modeId to remove a single mode instead. Provide exactly one of the two — not both."##
     )]
     async fn delete_variable(
         &self,

@@ -1,10 +1,10 @@
-import { hexToRgb } from "./write-helpers";
+import { parseColor } from "./color";
 import { assertNotFigjam } from "./figjam";
 
 const parseVariableValue = (type: string, value: any): VariableValue => {
   if (type === "COLOR") {
     if (typeof value === "string") {
-      const { r, g, b, a } = hexToRgb(value);
+      const { r, g, b, a } = parseColor(value);
       return { r, g, b, a };
     }
     return value as RGBA;
@@ -12,6 +12,19 @@ const parseVariableValue = (type: string, value: any): VariableValue => {
   if (type === "FLOAT") return typeof value === "number" ? value : parseFloat(String(value));
   if (type === "BOOLEAN") return value === true || value === "true";
   return String(value); // STRING
+};
+
+// Alias wins when aliasVariableId is given; createVariableAliasByIdAsync throws on
+// an unknown id and Figma rejects a type mismatch, so no extra checks here.
+const resolveVariableValue = async (type: string, p: any): Promise<VariableValue> =>
+  p.aliasVariableId
+    ? figma.variables.createVariableAliasByIdAsync(p.aliasVariableId)
+    : parseVariableValue(type, p.value);
+
+const CODE_SYNTAX_PLATFORMS: Record<string, CodeSyntaxPlatform> = {
+  codeSyntaxWeb: "WEB",
+  codeSyntaxAndroid: "ANDROID",
+  codeSyntaxIos: "iOS",
 };
 
 export const handleWriteVariableRequest = async (request: any) => {
@@ -64,9 +77,9 @@ export const handleWriteVariableRequest = async (request: any) => {
       const collection = await figma.variables.getVariableCollectionByIdAsync(p.collectionId);
       if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
       const variable = figma.variables.createVariable(p.name, collection, p.type as VariableResolvedDataType);
-      if (p.value != null && collection.modes.length > 0) {
+      if ((p.value != null || p.aliasVariableId) && collection.modes.length > 0) {
         const modeId = collection.modes[0].modeId;
-        variable.setValueForMode(modeId, parseVariableValue(p.type, p.value));
+        variable.setValueForMode(modeId, await resolveVariableValue(p.type, p));
       }
       figma.commitUndo();
       return {
@@ -86,21 +99,117 @@ export const handleWriteVariableRequest = async (request: any) => {
       assertNotFigjam("set_variable_value");
       if (!p.variableId) throw new Error("variableId is required");
       if (!p.modeId) throw new Error("modeId is required");
-      if (p.value == null) throw new Error("value is required");
+      if (p.value == null && !p.aliasVariableId) {
+        throw new Error("value or aliasVariableId is required");
+      }
       const variable = await figma.variables.getVariableByIdAsync(p.variableId);
       if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
-      variable.setValueForMode(p.modeId, parseVariableValue(variable.resolvedType, p.value));
+      variable.setValueForMode(
+        p.modeId,
+        await resolveVariableValue(variable.resolvedType, p),
+      );
       figma.commitUndo();
       return {
         type: request.type,
         requestId: request.requestId,
-        data: { variableId: variable.id, name: variable.name, modeId: p.modeId },
+        data: {
+          variableId: variable.id,
+          name: variable.name,
+          modeId: p.modeId,
+          alias: p.aliasVariableId != null ? p.aliasVariableId : null,
+        },
+      };
+    }
+
+    case "update_variable": {
+      const p = request.params || {};
+      assertNotFigjam("update_variable");
+      if (p.variableId) {
+        const variable = await figma.variables.getVariableByIdAsync(p.variableId);
+        if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
+        if (p.name != null) variable.name = p.name;
+        if (p.description != null) variable.description = p.description;
+        if (p.scopes != null) variable.scopes = p.scopes as VariableScope[];
+        if (p.hiddenFromPublishing != null) variable.hiddenFromPublishing = !!p.hiddenFromPublishing;
+        for (const key of Object.keys(CODE_SYNTAX_PLATFORMS)) {
+          if (p[key] != null) variable.setVariableCodeSyntax(CODE_SYNTAX_PLATFORMS[key], p[key]);
+        }
+        figma.commitUndo();
+        return {
+          type: request.type,
+          requestId: request.requestId,
+          data: {
+            variableId: variable.id,
+            name: variable.name,
+            scopes: variable.scopes,
+            codeSyntax: variable.codeSyntax,
+          },
+        };
+      }
+      if (p.collectionId) {
+        const collection = await figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+        if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+        if (p.name != null) collection.name = p.name;
+        if (p.hiddenFromPublishing != null) collection.hiddenFromPublishing = !!p.hiddenFromPublishing;
+        if (p.modeId && p.modeName) collection.renameMode(p.modeId, p.modeName);
+        figma.commitUndo();
+        return {
+          type: request.type,
+          requestId: request.requestId,
+          data: {
+            collectionId: collection.id,
+            name: collection.name,
+            modes: collection.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+          },
+        };
+      }
+      throw new Error("variableId or collectionId is required");
+    }
+
+    case "set_variable_mode": {
+      const p = request.params || {};
+      assertNotFigjam("set_variable_mode");
+      if (!p.collectionId) throw new Error("collectionId is required");
+      const collection = await figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+      if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+      const nodeId = request.nodeIds && request.nodeIds[0];
+      const target = nodeId ? await figma.getNodeByIdAsync(nodeId) : figma.currentPage;
+      if (!target) throw new Error(`Node not found: ${nodeId}`);
+      if (!("setExplicitVariableModeForCollection" in target)) {
+        throw new Error(`Node ${nodeId} does not support variable modes`);
+      }
+      // Object overloads only: manifest.json runs in dynamic-page mode, where the
+      // deprecated string-id overloads throw.
+      if (p.modeId) target.setExplicitVariableModeForCollection(collection, p.modeId);
+      else target.clearExplicitVariableModeForCollection(collection);
+      figma.commitUndo();
+      return {
+        type: request.type,
+        requestId: request.requestId,
+        data: {
+          id: target.id,
+          name: target.name,
+          collectionId: collection.id,
+          modeId: p.modeId != null ? p.modeId : null,
+          cleared: !p.modeId,
+        },
       };
     }
 
     case "delete_variable": {
       const p = request.params || {};
       assertNotFigjam("delete_variable");
+      if (p.collectionId && p.modeId) {
+        const collection = await figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+        if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+        collection.removeMode(p.modeId);
+        figma.commitUndo();
+        return {
+          type: request.type,
+          requestId: request.requestId,
+          data: { collectionId: p.collectionId, modeId: p.modeId, deleted: true },
+        };
+      }
       if (p.variableId) {
         const variable = await figma.variables.getVariableByIdAsync(p.variableId);
         if (!variable) throw new Error(`Variable not found: ${p.variableId}`);

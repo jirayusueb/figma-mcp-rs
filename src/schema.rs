@@ -85,6 +85,44 @@ fn valid_blend_mode(m: &str) -> bool {
     )
 }
 
+fn valid_variable_scope(s: &str) -> bool {
+    matches!(
+        s,
+        "ALL_SCOPES"
+            | "TEXT_CONTENT"
+            | "CORNER_RADIUS"
+            | "WIDTH_HEIGHT"
+            | "GAP"
+            | "ALL_FILLS"
+            | "FRAME_FILL"
+            | "SHAPE_FILL"
+            | "TEXT_FILL"
+            | "STROKE_COLOR"
+            | "STROKE_FLOAT"
+            | "EFFECT_FLOAT"
+            | "EFFECT_COLOR"
+            | "OPACITY"
+            | "FONT_FAMILY"
+            | "FONT_STYLE"
+            | "FONT_WEIGHT"
+            | "FONT_SIZE"
+            | "LINE_HEIGHT"
+            | "LETTER_SPACING"
+            | "PARAGRAPH_SPACING"
+            | "PARAGRAPH_INDENT"
+    )
+}
+
+fn invalid_color_format(params: &Value) -> Option<String> {
+    let fmt = str_param(params, "colorFormat")?;
+    if fmt.is_empty() || matches!(fmt, "hex" | "rgb" | "hsl" | "oklch") {
+        return None;
+    }
+    Some(format!(
+        "colorFormat must be hex, rgb, hsl, or oklch, got: {fmt}"
+    ))
+}
+
 fn validate_trigger_type_field(idx: usize, trigger: &Map<String, Value>) -> Option<String> {
     let t = trigger.get("type").and_then(Value::as_str).unwrap_or("");
     if !t.is_empty() && !valid_trigger_type(t) {
@@ -179,6 +217,27 @@ fn validate_auto_layout_params(params: &Value) -> Option<String> {
     if let Some(v) = str_param(params, "layoutWrap") {
         if !v.is_empty() && !matches!(v, "NO_WRAP" | "WRAP") {
             return Some(format!("layoutWrap must be NO_WRAP or WRAP, got: {v}"));
+        }
+    }
+    for key in ["layoutSizingHorizontal", "layoutSizingVertical"] {
+        if let Some(v) = str_param(params, key) {
+            if !v.is_empty() && !matches!(v, "FIXED" | "HUG" | "FILL") {
+                return Some(format!("{key} must be FIXED, HUG, or FILL, got: {v}"));
+            }
+        }
+    }
+    if let Some(v) = str_param(params, "layoutPositioning") {
+        if !v.is_empty() && !matches!(v, "AUTO" | "ABSOLUTE") {
+            return Some(format!(
+                "layoutPositioning must be AUTO or ABSOLUTE, got: {v}"
+            ));
+        }
+    }
+    if let Some(v) = str_param(params, "counterAxisAlignContent") {
+        if !v.is_empty() && !matches!(v, "AUTO" | "SPACE_BETWEEN") {
+            return Some(format!(
+                "counterAxisAlignContent must be AUTO or SPACE_BETWEEN, got: {v}"
+            ));
         }
     }
     None
@@ -400,11 +459,20 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
         }
 
+        "get_styles" => {
+            if let Some(err) = invalid_color_format(params) {
+                return Some(err);
+            }
+        }
+
         "export_tokens" => {
             if let Some(fmt) = str_param(params, "format") {
                 if !fmt.is_empty() && !matches!(fmt, "json" | "css") {
                     return Some(format!("format must be json or css, got: {fmt}"));
                 }
+            }
+            if let Some(err) = invalid_color_format(params) {
+                return Some(err);
             }
         }
 
@@ -432,14 +500,15 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
         }
 
         "set_auto_layout" => {
-            if node_ids.is_empty() || node_ids[0].is_empty() {
-                return Some("nodeId is required".into());
+            if node_ids.is_empty() {
+                return Some("nodeIds is required and must not be empty".into());
             }
-            if !valid_node_id(&node_ids[0]) {
-                return Some(format!(
-                    "nodeId must use colon format e.g. 4029:12345, got: {}",
-                    node_ids[0]
-                ));
+            for id in node_ids {
+                if !valid_node_id(id) {
+                    return Some(format!(
+                        "invalid nodeId: {id} — must use colon format e.g. 4029:12345"
+                    ));
+                }
             }
             if let Some(msg) = validate_auto_layout_params(params) {
                 return Some(msg);
@@ -507,7 +576,7 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             let color = str_param(params, "color").unwrap_or("");
             if color.is_empty() {
-                return Some("color is required (hex string e.g. #FF5733)".into());
+                return Some("color is required (hex, rgb(), hsl(), or oklch())".into());
             }
             if let Some(mode) = str_param(params, "mode") {
                 if mode != "replace" && mode != "append" {
@@ -611,7 +680,7 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             let color = str_param(params, "color").unwrap_or("");
             if color.is_empty() {
-                return Some("color is required (hex string e.g. #FF5733)".into());
+                return Some("color is required (hex, rgb(), hsl(), or oklch())".into());
             }
         }
 
@@ -681,16 +750,50 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
         }
 
-        "update_paint_style" => {
+        "update_style" => {
             let style_id = str_param(params, "styleId").unwrap_or("");
             if style_id.is_empty() {
                 return Some("styleId is required".into());
             }
-            if !has_param(params, "name")
-                && !has_param(params, "color")
-                && !has_param(params, "description")
-            {
-                return Some("at least one of name, color, or description is required".into());
+            const UPDATABLE: [&str; 17] = [
+                "name",
+                "description",
+                "color",
+                "fontFamily",
+                "fontStyle",
+                "fontSize",
+                "textDecoration",
+                "lineHeightValue",
+                "letterSpacingValue",
+                "effects",
+                "pattern",
+                "count",
+                "gutterSize",
+                "offset",
+                "alignment",
+                "sectionSize",
+                "opacity",
+            ];
+            if !UPDATABLE.iter().any(|key| has_param(params, key)) {
+                return Some("at least one field to update is required".into());
+            }
+            if let Some(a) = str_param(params, "alignment") {
+                if !a.is_empty() && !matches!(a, "STRETCH" | "CENTER" | "MIN" | "MAX") {
+                    return Some(format!(
+                        "alignment must be STRETCH, CENTER, MIN, or MAX, got: {a}"
+                    ));
+                }
+            }
+        }
+
+        "bind_variable_to_style" => {
+            let style_id = str_param(params, "styleId").unwrap_or("");
+            if style_id.is_empty() {
+                return Some("styleId is required".into());
+            }
+            let field = str_param(params, "field").unwrap_or("");
+            if field.is_empty() {
+                return Some("field is required".into());
             }
         }
 
@@ -745,8 +848,8 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             if mode_id.is_empty() {
                 return Some("modeId is required".into());
             }
-            if !has_param(params, "value") {
-                return Some("value is required".into());
+            if !has_param(params, "value") && !has_param(params, "aliasVariableId") {
+                return Some("value or aliasVariableId is required".into());
             }
         }
 
@@ -755,6 +858,43 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             let cid = str_param(params, "collectionId").unwrap_or("");
             if vid.is_empty() && cid.is_empty() {
                 return Some("variableId or collectionId is required".into());
+            }
+            if has_param(params, "modeId") && cid.is_empty() {
+                return Some("collectionId is required when modeId is given".into());
+            }
+        }
+
+        "update_variable" => {
+            let vid = str_param(params, "variableId").unwrap_or("");
+            let cid = str_param(params, "collectionId").unwrap_or("");
+            if vid.is_empty() && cid.is_empty() {
+                return Some("variableId or collectionId is required".into());
+            }
+            if let Some(mode_id) = str_param(params, "modeId") {
+                if !mode_id.is_empty() && str_param(params, "modeName").unwrap_or("").is_empty() {
+                    return Some("modeName is required when modeId is given".into());
+                }
+            }
+            if let Some(scopes) = params.get("scopes").and_then(|v| v.as_array()) {
+                for (i, scope) in scopes.iter().enumerate() {
+                    let name = scope.as_str().unwrap_or("");
+                    if !valid_variable_scope(name) {
+                        return Some(format!("scopes[{i}] is invalid: {name}"));
+                    }
+                }
+            }
+        }
+
+        "set_variable_mode" => {
+            let cid = str_param(params, "collectionId").unwrap_or("");
+            if cid.is_empty() {
+                return Some("collectionId is required".into());
+            }
+            if !node_ids.is_empty() && !node_ids[0].is_empty() && !valid_node_id(&node_ids[0]) {
+                return Some(format!(
+                    "nodeId must use colon format e.g. 4029:12345, got: {}",
+                    node_ids[0]
+                ));
             }
         }
 
@@ -788,10 +928,6 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
                     "nodeId must use colon format e.g. 4029:12345, got: {}",
                     node_ids[0]
                 ));
-            }
-            let variable_id = str_param(params, "variableId").unwrap_or("");
-            if variable_id.is_empty() {
-                return Some("variableId is required".into());
             }
             let field = str_param(params, "field").unwrap_or("");
             if field.is_empty() {
@@ -1385,6 +1521,11 @@ mod tests {
         assert!(validate_rpc("export_tokens", &[], &json!({"format": "yaml"})).is_some());
         assert!(validate_rpc("export_tokens", &[], &json!({"format": "json"})).is_none());
         assert!(validate_rpc("export_tokens", &[], &Value::Null).is_none());
+        assert!(validate_rpc("export_tokens", &[], &json!({"colorFormat": "lab"})).is_some());
+        assert!(validate_rpc("export_tokens", &[], &json!({"colorFormat": "oklch"})).is_none());
+        assert!(validate_rpc("get_styles", &[], &json!({"colorFormat": "lab"})).is_some());
+        assert!(validate_rpc("get_styles", &[], &json!({"colorFormat": "hsl"})).is_none());
+        assert!(validate_rpc("get_styles", &[], &Value::Null).is_none());
     }
 
     #[test]
@@ -1410,6 +1551,36 @@ mod tests {
             &json!({"primaryAxisSizingMode": "BOGUS"})
         )
         .is_some());
+        assert!(validate_rpc("set_auto_layout", &ids(&["1:1", "bad"]), &Value::Null).is_some());
+        assert!(validate_rpc(
+            "set_auto_layout",
+            &ids(&["1:1"]),
+            &json!({"layoutSizingHorizontal": "STRETCH"})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "set_auto_layout",
+            &ids(&["1:1"]),
+            &json!({"layoutPositioning": "FLOAT"})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "set_auto_layout",
+            &ids(&["1:1"]),
+            &json!({"counterAxisAlignContent": "MIDDLE"})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "set_auto_layout",
+            &ids(&["1:1", "2:2"]),
+            &json!({
+                "layoutSizingHorizontal": "FILL",
+                "layoutSizingVertical": "HUG",
+                "layoutPositioning": "ABSOLUTE",
+                "counterAxisAlignContent": "SPACE_BETWEEN"
+            })
+        )
+        .is_none());
         assert!(validate_rpc("set_auto_layout", &ids(&["1:1"]), &Value::Null).is_none());
     }
 
@@ -1523,12 +1694,30 @@ mod tests {
 
     #[test]
     fn update_and_delete_style() {
-        assert!(validate_rpc("update_paint_style", &[], &Value::Null).is_some());
-        assert!(validate_rpc("update_paint_style", &[], &json!({"styleId": "s1"})).is_some());
+        assert!(validate_rpc("update_style", &[], &Value::Null).is_some());
+        assert!(validate_rpc("update_style", &[], &json!({"styleId": "s1"})).is_some());
+        assert!(
+            validate_rpc("update_style", &[], &json!({"styleId": "s1", "name": "x"})).is_none()
+        );
         assert!(validate_rpc(
-            "update_paint_style",
+            "update_style",
             &[],
-            &json!({"styleId": "s1", "name": "x"})
+            &json!({"styleId": "s1", "fontSize": 18})
+        )
+        .is_none());
+        assert!(validate_rpc(
+            "update_style",
+            &[],
+            &json!({"styleId": "s1", "alignment": "SIDEWAYS"})
+        )
+        .is_some());
+
+        assert!(validate_rpc("bind_variable_to_style", &[], &json!({"styleId": "s1"})).is_some());
+        assert!(validate_rpc("bind_variable_to_style", &[], &json!({"field": "color"})).is_some());
+        assert!(validate_rpc(
+            "bind_variable_to_style",
+            &[],
+            &json!({"styleId": "s1", "field": "color"})
         )
         .is_none());
         assert!(validate_rpc("delete_style", &[], &Value::Null).is_some());
@@ -1573,9 +1762,64 @@ mod tests {
             &json!({"variableId": "v1", "modeId": "m1", "value": 1})
         )
         .is_none());
+        assert!(validate_rpc(
+            "set_variable_value",
+            &[],
+            &json!({"variableId": "v1", "modeId": "m1", "aliasVariableId": "v2"})
+        )
+        .is_none());
 
         assert!(validate_rpc("delete_variable", &[], &Value::Null).is_some());
         assert!(validate_rpc("delete_variable", &[], &json!({"variableId": "v1"})).is_none());
+        assert!(validate_rpc("delete_variable", &[], &json!({"modeId": "m1"})).is_some());
+        assert!(validate_rpc(
+            "delete_variable",
+            &[],
+            &json!({"collectionId": "c1", "modeId": "m1"})
+        )
+        .is_none());
+
+        assert!(validate_rpc("update_variable", &[], &json!({"name": "x"})).is_some());
+        assert!(validate_rpc("update_variable", &[], &json!({"variableId": "v1"})).is_none());
+        assert!(validate_rpc(
+            "update_variable",
+            &[],
+            &json!({"variableId": "v1", "scopes": ["NOPE"]})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "update_variable",
+            &[],
+            &json!({"variableId": "v1", "scopes": ["ALL_FILLS", "CORNER_RADIUS"]})
+        )
+        .is_none());
+        assert!(validate_rpc(
+            "update_variable",
+            &[],
+            &json!({"collectionId": "c1", "modeId": "m1"})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "update_variable",
+            &[],
+            &json!({"collectionId": "c1", "modeId": "m1", "modeName": "Dark"})
+        )
+        .is_none());
+
+        assert!(validate_rpc("set_variable_mode", &[], &Value::Null).is_some());
+        assert!(validate_rpc("set_variable_mode", &[], &json!({"collectionId": "c1"})).is_none());
+        assert!(validate_rpc(
+            "set_variable_mode",
+            &ids(&["bogus"]),
+            &json!({"collectionId": "c1", "modeId": "m1"})
+        )
+        .is_some());
+        assert!(validate_rpc(
+            "set_variable_mode",
+            &ids(&["1:1"]),
+            &json!({"collectionId": "c1", "modeId": "m1"})
+        )
+        .is_none());
     }
 
     #[test]
@@ -1599,6 +1843,12 @@ mod tests {
             "bind_variable_to_node",
             &ids(&["1:1"]),
             &json!({"variableId": "v1", "field": "fills"})
+        )
+        .is_none());
+        assert!(validate_rpc(
+            "bind_variable_to_node",
+            &ids(&["1:1"]),
+            &json!({"field": "cornerRadius"})
         )
         .is_none());
 

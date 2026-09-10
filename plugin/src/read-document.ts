@@ -1,4 +1,12 @@
-import { serializeNode, getBounds, serializeStyles, isMixed, deduplicateStyles } from "./serializers";
+import {
+  serializeNode,
+  getBounds,
+  serializeStyles,
+  serializeBoundVariables,
+  serializeVariableModes,
+  isMixed,
+  deduplicateStyles,
+} from "./serializers";
 
 export const handleReadDocumentRequest = async (request: any) => {
   switch (request.type) {
@@ -66,6 +74,10 @@ export const handleReadDocumentRequest = async (request: any) => {
         if (Object.keys(styles).length > 0) result.styles = styles;
         if ("opacity" in n && n.opacity !== 1) result.opacity = n.opacity;
         if ("visible" in n && !n.visible) result.visible = false;
+        const boundVariables = await serializeBoundVariables(n);
+        if (boundVariables) result.boundVariables = boundVariables;
+        const variableModes = await serializeVariableModes(n);
+        if (variableModes) result.variableModes = variableModes;
         if (detail === "compact") return result;
         return await serializeNode(n);
       };

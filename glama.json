@@ -2,7 +2,7 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": [],
   "name": "figma-mcp-rs",
-  "description": "Figma + FigJam MCP server with full read/write access via a plugin bridge. No API token, no REST rate limits. 75 tools and 12 prompts, written in Rust. Port of vkhanhqui/figma-mcp-go.",
+  "description": "Figma + FigJam MCP server with full read/write access via a plugin bridge. No API token, no REST rate limits. 78 tools and 12 prompts, written in Rust. Port of vkhanhqui/figma-mcp-go.",
   "license": "MIT",
   "tools": [
     {
@@ -11,7 +11,7 @@
     },
     {
       "name": "add_variable_mode",
-      "description": ""
+      "description": "Add a new mode to an existing variable collection (e.g. Light/Dark, Desktop/Mobile). Figma free plan allows only 1 mode per collection"
     },
     {
       "name": "apply_style_to_node",
@@ -23,7 +23,11 @@
     },
     {
       "name": "bind_variable_to_node",
-      "description": "Bind a local variable to a node property so the property is driven by the variable's value"
+      "description": "Bind a local variable to a node property so the property is driven by the variable's value; omit variableId to unbind"
+    },
+    {
+      "name": "bind_variable_to_style",
+      "description": "Bind a variable to a local style so the style itself is driven by a design token"
     },
     {
       "name": "clone_node",
@@ -55,7 +59,7 @@
     },
     {
       "name": "create_paint_style",
-      "description": "Create a new local paint style with a solid fill color"
+      "description": "Create a new local paint style with a solid fill color (hex, rgb(), hsl(), or oklch())"
     },
     {
       "name": "create_rectangle",
@@ -83,7 +87,7 @@
     },
     {
       "name": "create_variable_collection",
-      "description": ""
+      "description": "Create a new local variable collection with an optional initial mode name"
     },
     {
       "name": "delete_nodes",
@@ -99,7 +103,7 @@
     },
     {
       "name": "delete_variable",
-      "description": "Delete a single variable (provide variableId) or an entire collection and all its variables (provide collectionId)"
+      "description": "Delete a single variable (variableId), an entire collection (collectionId), or one mode (collectionId + modeId)"
     },
     {
       "name": "detach_instance",
@@ -111,7 +115,7 @@
     },
     {
       "name": "export_tokens",
-      "description": "Export all design tokens (variables and paint styles) as JSON or CSS custom properties"
+      "description": "Export all design tokens (variables and paint styles) as JSON or CSS custom properties, in hex, rgb, hsl, or oklch"
     },
     {
       "name": "find_replace_text",
@@ -167,7 +171,7 @@
     },
     {
       "name": "get_styles",
-      "description": "Get all local styles in the document (paint, text, effect, and grid)"
+      "description": "Get all local styles in the document (paint, text, effect, and grid), including descriptions, publish state, bound variables, and colors in hex, rgb, hsl, or oklch"
     },
     {
       "name": "get_variable_defs",
@@ -243,7 +247,7 @@
     },
     {
       "name": "set_auto_layout",
-      "description": "Set or update auto-layout (flex) properties on an existing frame"
+      "description": "Set auto-layout properties on one or more nodes. Container properties (layoutMode, padding, itemSpacing, alignment, wrap) apply to frames, components and instances. Sizing properties apply to the node itself: layoutSizingHorizontal/Vertical HUG needs the node to be an auto-layout frame or text, FILL needs the node to already sit inside an auto-layout parent, and layoutPositioning ABSOLUTE lifts a child out of the parent's flow. Figma only."
     },
     {
       "name": "set_blend_mode",
@@ -282,8 +286,12 @@
       "description": "Update the text content of an existing TEXT node"
     },
     {
+      "name": "set_variable_mode",
+      "description": "Switch which mode of a variable collection applies to a node or the current page — Light/Dark theming preview"
+    },
+    {
       "name": "set_variable_value",
-      "description": "Set a variable's value for a specific mode"
+      "description": "Set a variable's value for a specific mode, either a literal (hex, rgb(), hsl(), oklch()) or an alias to another variable"
     },
     {
       "name": "set_visible",
@@ -302,8 +310,12 @@
       "description": "Unlock one or more nodes, allowing them to be edited again"
     },
     {
-      "name": "update_paint_style",
-      "description": "Update an existing paint style's name, color, or description"
+      "name": "update_style",
+      "description": "Update an existing style in place: paint color, text font/size/line height, effect array, or grid pattern — plus name and description for any style type"
+    },
+    {
+      "name": "update_variable",
+      "description": "Update a variable's name, description, scopes, or Dev Mode code syntax, or rename a collection or one of its modes"
     }
   ]
 }

@@ -1,8 +1,8 @@
-// MANIFEST: get_styles | - | Get all local styles in the document (paint, text, effect, and grid). Returns each style's ID, name, type, and properties. Use the style ID with apply_style_to_node or update_paint_style. For design tokens (variables), use get_variable_defs instead.
+// MANIFEST: get_styles | GetStylesArgs | Get all local styles in the document (paint, text, effect, and grid). Returns each style's ID, name, type, and properties. Each style also reports description, publish state, bound variables, and colors in the notation you pass via colorFormat (hex, rgb, hsl, oklch). Use the style ID with apply_style_to_node or update_style. For design tokens (variables), use get_variable_defs instead.
 // MANIFEST: get_variable_defs | - | Get all local variable definitions: collections, modes, and values. Variables are Figma's design token system.
 // MANIFEST: get_local_components | - | Get all components defined in the current Figma file.
 // MANIFEST: get_annotations | GetAnnotationsArgs | Get dev-mode annotations in the current document or scoped to a specific node. Returns annotation objects with label text, measurement type, and the ID of the annotated node. Omit nodeId to retrieve all annotations on the current page.
-// MANIFEST: export_tokens | ExportTokensArgs | Export all design tokens (variables and paint styles) as JSON or CSS custom properties. Ideal for bridging Figma variables into your codebase.
+// MANIFEST: export_tokens | ExportTokensArgs | Export all design tokens (variables and paint styles) as JSON or CSS custom properties. Ideal for bridging Figma variables into your codebase. colorFormat picks the notation for exported colors: hex, rgb (default for css), hsl, or oklch.
 
 //! Read-style tools. Ported from figma-mcp-go internal/tools_read_styles.go.
 
@@ -26,14 +26,28 @@ pub(crate) struct GetAnnotationsArgs {
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct GetStylesArgs {
+    /// Color notation for style colors: hex (default), rgb, hsl, or oklch
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ExportTokensArgs {
     /// Output format: json (default) or css
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    /// Color notation for exported colors: hex, rgb, hsl, or oklch (default rgb for css, hex for json)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_format: Option<String>,
 }
 
-pub(crate) async fn get_styles(node: Arc<Node>) -> Result<CallToolResult, McpError> {
-    relay_params(&node, "get_styles", serde_json::Value::Null).await
+pub(crate) async fn get_styles(
+    node: Arc<Node>,
+    args: GetStylesArgs,
+) -> Result<CallToolResult, McpError> {
+    relay(&node, "get_styles", &args).await
 }
 
 pub(crate) async fn get_variable_defs(node: Arc<Node>) -> Result<CallToolResult, McpError> {

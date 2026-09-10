@@ -11,6 +11,9 @@ import {
   serializeStyles,
   serializeText,
   serializeNode,
+  serializeBoundVariables,
+  serializeVariableModes,
+  clearVariableNameCache,
 } from "./serializers";
 
 // ── Figma global mock ─────────────────────────────────────────────────────────
@@ -331,6 +334,89 @@ describe("serializeStyles", () => {
     const result = await serializeStyles(node);
     expect(result.padding).toEqual({ top: 5, right: 20, bottom: 15, left: 10 });
   });
+
+  it("includes layout for an auto-layout node", async () => {
+    const result = await serializeStyles({
+      layoutMode: "HORIZONTAL",
+      itemSpacing: 16,
+      primaryAxisAlignItems: "CENTER",
+      counterAxisAlignItems: "MIN",
+      primaryAxisSizingMode: "FIXED",
+      counterAxisSizingMode: "AUTO",
+      layoutWrap: "NO_WRAP",
+    });
+    expect(result.layout).toEqual({
+      mode: "HORIZONTAL",
+      itemSpacing: 16,
+      primaryAxisAlignItems: "CENTER",
+      counterAxisAlignItems: "MIN",
+      primaryAxisSizingMode: "FIXED",
+      counterAxisSizingMode: "AUTO",
+    });
+  });
+
+  it("omits layout when layoutMode is NONE", async () => {
+    const result = await serializeStyles({ layoutMode: "NONE", itemSpacing: 0 });
+    expect(result.layout).toBeUndefined();
+  });
+
+  it("includes wrap details only when wrapping", async () => {
+    const wrapped = await serializeStyles({
+      layoutMode: "HORIZONTAL",
+      layoutWrap: "WRAP",
+      counterAxisSpacing: 8,
+      counterAxisAlignContent: "SPACE_BETWEEN",
+    });
+    expect(wrapped.layout.layoutWrap).toBe("WRAP");
+    expect(wrapped.layout.counterAxisSpacing).toBe(8);
+    expect(wrapped.layout.counterAxisAlignContent).toBe("SPACE_BETWEEN");
+
+    const flat = await serializeStyles({
+      layoutMode: "HORIZONTAL",
+      layoutWrap: "NO_WRAP",
+      counterAxisSpacing: 8,
+      counterAxisAlignContent: "SPACE_BETWEEN",
+    });
+    expect(flat.layout.counterAxisSpacing).toBeUndefined();
+    expect(flat.layout.counterAxisAlignContent).toBeUndefined();
+  });
+
+  it("includes layoutSizing for a child of an auto-layout parent", async () => {
+    const result = await serializeStyles({
+      layoutSizingHorizontal: "FILL",
+      layoutSizingVertical: "FIXED",
+      layoutPositioning: "AUTO",
+      parent: { layoutMode: "VERTICAL" },
+    });
+    expect(result.layoutSizing).toEqual({ horizontal: "FILL", vertical: "FIXED" });
+    expect(result.layoutPositioning).toBeUndefined();
+  });
+
+  it("omits layoutSizing when fixed on both axes or the parent has no auto layout", async () => {
+    const fixed = await serializeStyles({
+      layoutSizingHorizontal: "FIXED",
+      layoutSizingVertical: "FIXED",
+      parent: { layoutMode: "HORIZONTAL" },
+    });
+    expect(fixed.layoutSizing).toBeUndefined();
+
+    const plainParent = await serializeStyles({
+      layoutSizingHorizontal: "FILL",
+      layoutSizingVertical: "FILL",
+      parent: { layoutMode: "NONE" },
+    });
+    expect(plainParent.layoutSizing).toBeUndefined();
+  });
+
+  it("reports absolute positioning", async () => {
+    const result = await serializeStyles({
+      layoutSizingHorizontal: "FIXED",
+      layoutSizingVertical: "FIXED",
+      layoutPositioning: "ABSOLUTE",
+      parent: { layoutMode: "VERTICAL" },
+    });
+    expect(result.layoutPositioning).toBe("ABSOLUTE");
+  });
 });
 
 // ── serializeText ─────────────────────────────────────────────────────────────
@@ -497,5 +583,71 @@ describe("serializeNode", () => {
     const result = await serializeNode(node);
     expect(result.children).toHaveLength(1);
     expect(result.children[0].id).toBe("1:4");
+  });
+});
+
+// ── variable bindings ─────────────────────────────────────────────────────────
+
+describe("serializeBoundVariables", () => {
+  beforeEach(() => {
+    clearVariableNameCache();
+    const names: Record<string, string> = { v1: "radius/md", v2: "color/primary" };
+    (globalThis as any).figma.variables = {
+      getVariableByIdAsync: async (id: string) =>
+        names[id] ? { id, name: names[id] } : null,
+    };
+  });
+
+  it("resolves single aliases and alias arrays to names", async () => {
+    const result = await serializeBoundVariables({
+      boundVariables: {
+        cornerRadius: { type: "VARIABLE_ALIAS", id: "v1" },
+        fills: [{ type: "VARIABLE_ALIAS", id: "v2" }],
+      },
+    } as any);
+    expect(result).toEqual({
+      cornerRadius: { id: "v1", name: "radius/md" },
+      fills: [{ id: "v2", name: "color/primary" }],
+    });
+  });
+
+  it("returns undefined when nothing is bound", async () => {
+    expect(await serializeBoundVariables({} as any)).toBeUndefined();
+    expect(await serializeBoundVariables({ boundVariables: {} } as any)).toBeUndefined();
+  });
+
+  it("reports a deleted variable as a null name", async () => {
+    const result = await serializeBoundVariables({
+      boundVariables: { opacity: { type: "VARIABLE_ALIAS", id: "gone" } },
+    } as any);
+    expect(result).toEqual({ opacity: { id: "gone", name: null } });
+  });
+});
+
+describe("serializeVariableModes", () => {
+  beforeEach(() => {
+    (globalThis as any).figma.variables = {
+      getVariableCollectionByIdAsync: async (id: string) =>
+        id === "c1"
+          ? { id, name: "Semantic", modes: [{ modeId: "m2", name: "Dark" }] }
+          : null,
+    };
+  });
+
+  it("maps collection ids and mode ids to names", async () => {
+    expect(await serializeVariableModes({ explicitVariableModes: { c1: "m2" } })).toEqual({
+      Semantic: "Dark",
+    });
+  });
+
+  it("falls back to raw ids for a deleted collection", async () => {
+    expect(await serializeVariableModes({ explicitVariableModes: { gone: "m9" } })).toEqual({
+      gone: "m9",
+    });
+  });
+
+  it("returns undefined when no mode is overridden", async () => {
+    expect(await serializeVariableModes({})).toBeUndefined();
+    expect(await serializeVariableModes({ explicitVariableModes: {} })).toBeUndefined();
   });
 });

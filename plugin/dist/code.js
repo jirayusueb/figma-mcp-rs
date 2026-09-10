@@ -116,17 +116,146 @@ ${p.code}
   function assertNotFigjam(feature) {
     if (isFigjam()) throw new Error(`${feature} is not available in FigJam`);
   }
-  const hexToRgb = (hex) => {
-    const clean = hex.replace("#", "");
+  const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+  const num = (token) => token == null ? NaN : parseFloat(token);
+  const isPct = (token) => token.trim().endsWith("%");
+  const parseAlpha = (token) => {
+    if (token == null || token.trim() === "") return 1;
+    const v = num(token);
+    if (isNaN(v)) return NaN;
+    return clamp01(isPct(token) ? v / 100 : v);
+  };
+  const splitComponents = (body) => {
+    const slash = body.split("/");
+    const parts = slash[0].trim().split(/[,\s]+/).filter((t) => t !== "");
+    if (slash.length > 1) parts.push(slash[1]);
+    return parts;
+  };
+  const parseHex = (clean) => {
+    if (!/^[0-9a-f]+$/.test(clean)) return null;
+    if (clean.length === 3 || clean.length === 4) {
+      const ch = (i) => parseInt(clean[i] + clean[i], 16) / 255;
+      return { r: ch(0), g: ch(1), b: ch(2), a: clean.length === 4 ? ch(3) : 1 };
+    }
+    if (clean.length === 6 || clean.length === 8) {
+      const ch = (i) => parseInt(clean.slice(i, i + 2), 16) / 255;
+      return { r: ch(0), g: ch(2), b: ch(4), a: clean.length === 8 ? ch(6) : 1 };
+    }
+    return null;
+  };
+  const hslToRgb = (h, s, l) => {
+    const hp = (h % 360 + 360) % 360 / 60;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(hp % 2 - 1));
+    const m = l - c / 2;
+    const seg = Math.floor(hp) % 6;
+    const table = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][seg];
+    return { r: table[0] + m, g: table[1] + m, b: table[2] + m };
+  };
+  const rgbToHsl = (r, g, b) => {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d < 1e-4) return { h: 0, s: 0, l };
+    const s = d / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === r) h = (g - b) / d % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+    return { h, s, l };
+  };
+  const gammaEncode = (c) => clamp01(c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  const gammaDecode = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const oklchToRgb = (L, C, H) => {
+    const hr = H * Math.PI / 180;
+    const a = C * Math.cos(hr);
+    const bb = C * Math.sin(hr);
+    const l_ = L + 0.3963377774 * a + 0.2158037573 * bb;
+    const m_ = L - 0.1055613458 * a - 0.0638541728 * bb;
+    const s_ = L - 0.0894841775 * a - 1.291485548 * bb;
+    const l = l_ * l_ * l_;
+    const m = m_ * m_ * m_;
+    const s = s_ * s_ * s_;
     return {
-      r: parseInt(clean.slice(0, 2), 16) / 255,
-      g: parseInt(clean.slice(2, 4), 16) / 255,
-      b: parseInt(clean.slice(4, 6), 16) / 255,
-      a: clean.length >= 8 ? parseInt(clean.slice(6, 8), 16) / 255 : 1
+      r: gammaEncode(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+      g: gammaEncode(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+      b: gammaEncode(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)
     };
   };
+  const rgbToOklch = (r, g, b) => {
+    const lr = gammaDecode(r);
+    const lg = gammaDecode(g);
+    const lb = gammaDecode(b);
+    const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+    const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+    const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+    const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+    const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+    const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+    const C = Math.sqrt(A * A + B * B);
+    if (C < 1e-4) return { L, C: 0, H: 0 };
+    let H = Math.atan2(B, A) * 180 / Math.PI;
+    if (H < 0) H += 360;
+    return { L, C, H };
+  };
+  const parseColor = (input) => {
+    const raw = String(input).trim().toLowerCase();
+    const fn = /^(rgb|rgba|hsl|hsla|oklch)\(([^)]*)\)$/.exec(raw);
+    if (!fn) {
+      const hex = parseHex(raw.charAt(0) === "#" ? raw.slice(1) : raw);
+      if (hex) return hex;
+      throw new Error(
+        `Unrecognized color: ${input} — use hex (#3b82f6), rgb(), hsl(), or oklch()`
+      );
+    }
+    const parts = splitComponents(fn[2]);
+    const a = parseAlpha(parts[3]);
+    const c1 = num(parts[0]);
+    const c2 = num(parts[1]);
+    const c3 = num(parts[2]);
+    if (parts.length >= 3 && !isNaN(a) && !isNaN(c1) && !isNaN(c2) && !isNaN(c3)) {
+      if (fn[1] === "rgb" || fn[1] === "rgba") {
+        const ch = (v, token) => clamp01(isPct(token) ? v / 100 : v / 255);
+        return { r: ch(c1, parts[0]), g: ch(c2, parts[1]), b: ch(c3, parts[2]), a };
+      }
+      if (fn[1] === "hsl" || fn[1] === "hsla") {
+        return __spreadProps(__spreadValues({}, hslToRgb(c1, clamp01(c2 / 100), clamp01(c3 / 100))), { a });
+      }
+      const L = isPct(parts[0]) ? c1 / 100 : c1;
+      const C = isPct(parts[1]) ? c2 / 100 * 0.4 : c2;
+      return __spreadProps(__spreadValues({}, oklchToRgb(L, C, c3)), { a });
+    }
+    throw new Error(
+      `Unrecognized color: ${input} — use hex (#3b82f6), rgb(), hsl(), or oklch()`
+    );
+  };
+  const formatColor = (color, format = "hex") => {
+    const r = clamp01(color.r);
+    const g = clamp01(color.g);
+    const b = clamp01(color.b);
+    const a = color.a == null ? 1 : clamp01(color.a);
+    if (format === "rgb") {
+      const byte2 = (v) => Math.round(v * 255);
+      return a < 1 ? `rgba(${byte2(r)}, ${byte2(g)}, ${byte2(b)}, ${a.toFixed(2)})` : `rgb(${byte2(r)}, ${byte2(g)}, ${byte2(b)})`;
+    }
+    if (format === "hsl") {
+      const hsl = rgbToHsl(r, g, b);
+      const body = `${Math.round(hsl.h)} ${(hsl.s * 100).toFixed(1)}% ${(hsl.l * 100).toFixed(1)}%`;
+      return a < 1 ? `hsl(${body} / ${a.toFixed(2)})` : `hsl(${body})`;
+    }
+    if (format === "oklch") {
+      const ok = rgbToOklch(r, g, b);
+      const body = `${ok.L.toFixed(4)} ${ok.C.toFixed(4)} ${ok.H.toFixed(2)}`;
+      return a < 1 ? `oklch(${body} / ${a.toFixed(2)})` : `oklch(${body})`;
+    }
+    const byte = (v) => Math.round(v * 255).toString(16).padStart(2, "0");
+    return `#${byte(r)}${byte(g)}${byte(b)}${a < 1 ? byte(a) : ""}`;
+  };
   const makeSolidPaint = (colorInput, opacityOverride) => {
-    const { r, g, b, a } = typeof colorInput === "string" ? hexToRgb(colorInput) : { r: colorInput.r, g: colorInput.g, b: colorInput.b, a: colorInput.a != null ? colorInput.a : 1 };
+    const { r, g, b, a } = typeof colorInput === "string" ? parseColor(colorInput) : { r: colorInput.r, g: colorInput.g, b: colorInput.b, a: colorInput.a != null ? colorInput.a : 1 };
     const eff = opacityOverride != null ? opacityOverride : a;
     const paint = { type: "SOLID", color: { r, g, b } };
     if (eff !== 1) paint.opacity = eff;
@@ -155,7 +284,17 @@ ${p.code}
       if (p.counterAxisSpacing != null && frame.layoutWrap === "WRAP") {
         frame.counterAxisSpacing = Number(p.counterAxisSpacing);
       }
+      if (p.counterAxisAlignContent && frame.layoutWrap === "WRAP") {
+        frame.counterAxisAlignContent = p.counterAxisAlignContent;
+      }
+      if (p.itemReverseZIndex != null) frame.itemReverseZIndex = !!p.itemReverseZIndex;
+      if (p.strokesIncludedInLayout != null) frame.strokesIncludedInLayout = !!p.strokesIncludedInLayout;
     }
+  };
+  const applyLayoutSizing = (node, p) => {
+    if (p.layoutPositioning) node.layoutPositioning = p.layoutPositioning;
+    if (p.layoutSizingHorizontal) node.layoutSizingHorizontal = p.layoutSizingHorizontal;
+    if (p.layoutSizingVertical) node.layoutSizingVertical = p.layoutSizingVertical;
   };
   const base64ToBytes = (b64) => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -181,11 +320,7 @@ ${p.code}
   };
   const isMixed = (value) => typeof value === "symbol";
   const pixelRound = (v) => Math.round(v * 100) / 100;
-  const toHex = (color) => {
-    const clamp = (v) => Math.min(255, Math.max(0, Math.round(v * 255)));
-    const [r, g, b] = [clamp(color.r), clamp(color.g), clamp(color.b)];
-    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-  };
+  const toHex = (color) => formatColor({ r: color.r, g: color.g, b: color.b, a: 1 }, "hex");
   const serializePaints = (paints) => {
     if (isMixed(paints)) return "mixed";
     if (!paints || !Array.isArray(paints)) return void 0;
@@ -238,6 +373,52 @@ ${p.code}
         left: node.paddingLeft
       };
     }
+    if ("layoutMode" in node && node.layoutMode !== "NONE") {
+      const layout = {
+        mode: node.layoutMode,
+        itemSpacing: node.itemSpacing,
+        primaryAxisAlignItems: node.primaryAxisAlignItems,
+        counterAxisAlignItems: node.counterAxisAlignItems,
+        primaryAxisSizingMode: node.primaryAxisSizingMode,
+        counterAxisSizingMode: node.counterAxisSizingMode
+      };
+      if (node.layoutWrap === "WRAP") {
+        layout.layoutWrap = "WRAP";
+        layout.counterAxisSpacing = node.counterAxisSpacing;
+        layout.counterAxisAlignContent = node.counterAxisAlignContent;
+      }
+      if (node.itemReverseZIndex) layout.itemReverseZIndex = true;
+      if (node.strokesIncludedInLayout) layout.strokesIncludedInLayout = true;
+      styles.layout = layout;
+    }
+    const layoutParent = node.parent;
+    if (layoutParent && layoutParent.layoutMode && layoutParent.layoutMode !== "NONE") {
+      const horizontal = node.layoutSizingHorizontal;
+      const vertical = node.layoutSizingVertical;
+      if (horizontal !== "FIXED" || vertical !== "FIXED") {
+        styles.layoutSizing = { horizontal, vertical };
+      }
+      if (node.layoutPositioning === "ABSOLUTE") styles.layoutPositioning = "ABSOLUTE";
+    }
+    const shortKeys = {
+      fillStyleId: "fill",
+      strokeStyleId: "stroke",
+      textStyleId: "text",
+      effectStyleId: "effect",
+      gridStyleId: "grid"
+    };
+    const nameKeys = { effect: "effectStyle", grid: "gridStyle" };
+    const styleIds = {};
+    for (const idKey of Object.keys(shortKeys)) {
+      const id = node[idKey];
+      if (!id || typeof id !== "string") continue;
+      styleIds[shortKeys[idKey]] = id;
+      const nameKey = nameKeys[shortKeys[idKey]];
+      if (!nameKey) continue;
+      const style = yield figma.getStyleByIdAsync(id);
+      if (style) styles[nameKey] = style.name;
+    }
+    if (Object.keys(styleIds).length > 0) styles.styleIds = styleIds;
     return styles;
   });
   const serializeLineHeight = (lineHeight) => {
@@ -302,13 +483,15 @@ ${p.code}
       return { id: node.id, name: node.name, type: node.type, bounds: getBounds(node) };
     }
     const styles = yield serializeStyles(node);
-    const base = {
+    const boundVariables = yield serializeBoundVariables(node);
+    const variableModes = yield serializeVariableModes(node);
+    const base = __spreadValues(__spreadValues({
       id: node.id,
       name: node.name,
       type: node.type,
       bounds: getBounds(node),
       styles
-    };
+    }, boundVariables ? { boundVariables } : {}), variableModes ? { variableModes } : {});
     if (node.type === "TEXT") return serializeText(node, base);
     if ("children" in node) {
       return Object.assign({}, base, {
@@ -381,6 +564,54 @@ ${p.code}
     }
     return value;
   };
+  const variableNameCache = /* @__PURE__ */ new Map();
+  const clearVariableNameCache = () => variableNameCache.clear();
+  const variableName = (id) => __async(null, null, function* () {
+    const cached = variableNameCache.get(id);
+    if (cached !== void 0) return cached;
+    const variable = yield figma.variables.getVariableByIdAsync(id);
+    const name = variable ? variable.name : null;
+    variableNameCache.set(id, name);
+    return name;
+  });
+  const isAlias = (value) => !!value && typeof value === "object" && value.type === "VARIABLE_ALIAS" && typeof value.id === "string";
+  const withAliasName = (value) => __async(null, null, function* () {
+    return isAlias(value) ? { type: "VARIABLE_ALIAS", id: value.id, name: yield variableName(value.id) } : value;
+  });
+  const serializeBoundVariables = (target) => __async(null, null, function* () {
+    const bound = target.boundVariables;
+    if (!bound) return void 0;
+    const result2 = {};
+    for (const field of Object.keys(bound)) {
+      const value = bound[field];
+      if (Array.isArray(value)) {
+        result2[field] = yield Promise.all(
+          value.map((alias) => __async(null, null, function* () {
+            return { id: alias.id, name: yield variableName(alias.id) };
+          }))
+        );
+      } else if (isAlias(value)) {
+        result2[field] = { id: value.id, name: yield variableName(value.id) };
+      }
+    }
+    return Object.keys(result2).length > 0 ? result2 : void 0;
+  });
+  const serializeVariableModes = (node) => __async(null, null, function* () {
+    const modes = node.explicitVariableModes;
+    if (!modes || Object.keys(modes).length === 0) return void 0;
+    const result2 = {};
+    for (const collectionId of Object.keys(modes)) {
+      const modeId = modes[collectionId];
+      const collection = yield figma.variables.getVariableCollectionByIdAsync(collectionId);
+      if (!collection) {
+        result2[collectionId] = modeId;
+        continue;
+      }
+      const mode = collection.modes.find((m) => m.modeId === modeId);
+      result2[collection.name] = mode ? mode.name : modeId;
+    }
+    return result2;
+  });
   const handleFigjamToolRequest = (request2) => __async(null, null, function* () {
     const req = request2;
     if (!req || typeof req !== "object") return null;
@@ -721,6 +952,10 @@ ${p.code}
           if (Object.keys(styles).length > 0) result2.styles = styles;
           if ("opacity" in n && n.opacity !== 1) result2.opacity = n.opacity;
           if ("visible" in n && !n.visible) result2.visible = false;
+          const boundVariables = yield serializeBoundVariables(n);
+          if (boundVariables) result2.boundVariables = boundVariables;
+          const variableModes = yield serializeVariableModes(n);
+          if (variableModes) result2.variableModes = variableModes;
           if (detail === "compact") return result2;
           return yield serializeNode(n);
         });
@@ -1054,10 +1289,26 @@ ${p.code}
         return null;
     }
   });
+  const cssVarName = (name) => "--" + name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const formatColors = (items, colorFormat) => items.map((item) => {
+    if (!item || typeof item !== "object" || !item.color) return item;
+    const a = item.color.a != null ? item.color.a : item.opacity != null ? item.opacity : 1;
+    return __spreadProps(__spreadValues({}, item), { color: formatColor(__spreadProps(__spreadValues({}, item.color), { a }), colorFormat) });
+  });
+  const styleMeta = (style) => __async(null, null, function* () {
+    return {
+      id: style.id,
+      name: style.name,
+      description: style.description || void 0,
+      remote: style.remote,
+      key: style.key,
+      boundVariables: yield serializeBoundVariables(style)
+    };
+  });
   const handleReadStyleRequest = (request2) => __async(null, null, function* () {
-    var _a;
     switch (request2.type) {
       case "get_styles": {
+        const colorFormat = request2.params && request2.params.colorFormat || "hex";
         const [paintStyles, textStyles, effectStyles, gridStyles] = yield Promise.all([
           figma.getLocalPaintStylesAsync(),
           figma.getLocalTextStylesAsync(),
@@ -1068,31 +1319,39 @@ ${p.code}
           type: request2.type,
           requestId: request2.requestId,
           data: {
-            paints: paintStyles.map((s) => ({
-              id: s.id,
-              name: s.name,
-              paints: s.paints
-            })),
-            text: textStyles.map((s) => ({
-              id: s.id,
-              name: s.name,
-              fontSize: s.fontSize,
-              fontFamily: s.fontName ? s.fontName.family : void 0,
-              fontStyle: s.fontName ? s.fontName.style : void 0,
-              textDecoration: s.textDecoration !== "NONE" ? s.textDecoration : void 0,
-              lineHeight: s.lineHeight,
-              letterSpacing: s.letterSpacing
-            })),
-            effects: effectStyles.map((s) => ({
-              id: s.id,
-              name: s.name,
-              effects: s.effects
-            })),
-            grids: gridStyles.map((s) => ({
-              id: s.id,
-              name: s.name,
-              layoutGrids: s.layoutGrids
-            }))
+            paints: yield Promise.all(
+              paintStyles.map((s) => __async(null, null, function* () {
+                return __spreadProps(__spreadValues({}, yield styleMeta(s)), {
+                  paints: formatColors(s.paints, colorFormat)
+                });
+              }))
+            ),
+            text: yield Promise.all(
+              textStyles.map((s) => __async(null, null, function* () {
+                return __spreadProps(__spreadValues({}, yield styleMeta(s)), {
+                  fontSize: s.fontSize,
+                  fontFamily: s.fontName ? s.fontName.family : void 0,
+                  fontStyle: s.fontName ? s.fontName.style : void 0,
+                  textDecoration: s.textDecoration !== "NONE" ? s.textDecoration : void 0,
+                  lineHeight: s.lineHeight,
+                  letterSpacing: s.letterSpacing
+                });
+              }))
+            ),
+            effects: yield Promise.all(
+              effectStyles.map((s) => __async(null, null, function* () {
+                return __spreadProps(__spreadValues({}, yield styleMeta(s)), {
+                  effects: formatColors(s.effects, colorFormat)
+                });
+              }))
+            ),
+            grids: yield Promise.all(
+              gridStyles.map((s) => __async(null, null, function* () {
+                return __spreadProps(__spreadValues({}, yield styleMeta(s)), {
+                  layoutGrids: formatColors(s.layoutGrids, colorFormat)
+                });
+              }))
+            )
           }
         };
       }
@@ -1108,23 +1367,42 @@ ${p.code}
             return {
               id: collection.id,
               name: collection.name,
+              defaultModeId: collection.defaultModeId,
+              remote: collection.remote,
+              hiddenFromPublishing: collection.hiddenFromPublishing,
+              key: collection.key,
               modes: collection.modes.map((mode) => ({
                 modeId: mode.modeId,
                 name: mode.name
               })),
-              variables: variables.filter((v) => v !== null).map((variable) => ({
-                id: variable.id,
-                name: variable.name,
-                resolvedType: variable.resolvedType,
-                valuesByMode: Object.fromEntries(
-                  Object.entries(variable.valuesByMode).map(
-                    ([modeId, value]) => [
-                      modeId,
-                      serializeVariableValue(value)
-                    ]
-                  )
-                )
-              }))
+              variables: yield Promise.all(
+                variables.filter((v) => v !== null).map((variable) => __async(null, null, function* () {
+                  return {
+                    id: variable.id,
+                    name: variable.name,
+                    resolvedType: variable.resolvedType,
+                    description: variable.description || void 0,
+                    scopes: variable.scopes,
+                    codeSyntax: variable.codeSyntax,
+                    hiddenFromPublishing: variable.hiddenFromPublishing,
+                    remote: variable.remote,
+                    key: variable.key,
+                    variableCollectionId: variable.variableCollectionId,
+                    valuesByMode: Object.fromEntries(
+                      yield Promise.all(
+                        Object.entries(variable.valuesByMode).map(
+                          (_0) => __async(null, [_0], function* ([modeId, value]) {
+                            return [
+                              modeId,
+                              yield withAliasName(serializeVariableValue(value))
+                            ];
+                          })
+                        )
+                      )
+                    )
+                  };
+                }))
+              )
             };
           }))
         );
@@ -1226,6 +1504,8 @@ ${p.code}
       }
       case "export_tokens": {
         const format = request2.params && request2.params.format || "json";
+        const requestedFormat = request2.params && request2.params.colorFormat;
+        const colorFormat = requestedFormat || (format === "css" ? "rgb" : "hex");
         const collections = yield figma.variables.getLocalVariableCollectionsAsync();
         const paintStyles = yield figma.getLocalPaintStylesAsync();
         if (format === "css") {
@@ -1237,30 +1517,24 @@ ${p.code}
               const variable = yield figma.variables.getVariableByIdAsync(varId);
               if (!variable) continue;
               const val = variable.valuesByMode[firstMode.modeId];
-              const cssName = "--" + variable.name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
               let cssValue = null;
-              if (variable.resolvedType === "COLOR" && val && typeof val === "object" && "r" in val) {
-                const c = val;
-                const r = Math.round(c.r * 255);
-                const g = Math.round(c.g * 255);
-                const b = Math.round(c.b * 255);
-                cssValue = c.a < 1 ? `rgba(${r}, ${g}, ${b}, ${c.a.toFixed(2)})` : `rgb(${r}, ${g}, ${b})`;
+              if (val && typeof val === "object" && "type" in val && val.type === "VARIABLE_ALIAS") {
+                const target = yield variableName(val.id);
+                if (target) cssValue = `var(${cssVarName(target)})`;
+              } else if (variable.resolvedType === "COLOR" && val && typeof val === "object" && "r" in val) {
+                cssValue = formatColor(val, colorFormat);
               } else if (variable.resolvedType === "FLOAT" || variable.resolvedType === "STRING" || variable.resolvedType === "BOOLEAN") {
                 cssValue = String(val);
               }
-              if (cssValue !== null) lines.push(`  ${cssName}: ${cssValue};`);
+              if (cssValue !== null) lines.push(`  ${cssVarName(variable.name)}: ${cssValue};`);
             }
           }
           for (const style of paintStyles) {
             if (style.paints.length === 1 && style.paints[0].type === "SOLID") {
               const paint = style.paints[0];
-              const cssName = "--" + style.name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
-              const r = Math.round(paint.color.r * 255);
-              const g = Math.round(paint.color.g * 255);
-              const b = Math.round(paint.color.b * 255);
-              const a = (_a = paint.opacity) != null ? _a : 1;
-              const cssValue = a < 1 ? `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})` : `rgb(${r}, ${g}, ${b})`;
-              lines.push(`  ${cssName}: ${cssValue};`);
+              const a = paint.opacity != null ? paint.opacity : 1;
+              const cssValue = formatColor(__spreadProps(__spreadValues({}, paint.color), { a }), colorFormat);
+              lines.push(`  ${cssVarName(style.name)}: ${cssValue};`);
             }
           }
           lines.push("}");
@@ -1274,7 +1548,11 @@ ${p.code}
             if (!variable) continue;
             const modeValues = {};
             for (const mode of coll.modes) {
-              modeValues[mode.name] = serializeVariableValue(variable.valuesByMode[mode.modeId]);
+              const serialized = yield withAliasName(
+                serializeVariableValue(variable.valuesByMode[mode.modeId])
+              );
+              const isColor = !!serialized && typeof serialized === "object" && serialized.type === "COLOR";
+              modeValues[mode.name] = requestedFormat && isColor ? formatColor(serialized, colorFormat) : serialized;
             }
             const parts = variable.name.split("/");
             let obj = collTokens;
@@ -1290,16 +1568,17 @@ ${p.code}
         for (const style of paintStyles) {
           if (style.paints.length === 1 && style.paints[0].type === "SOLID") {
             const paint = style.paints[0];
-            const r = Math.round(paint.color.r * 255).toString(16).padStart(2, "0");
-            const g = Math.round(paint.color.g * 255).toString(16).padStart(2, "0");
-            const b = Math.round(paint.color.b * 255).toString(16).padStart(2, "0");
+            const a = paint.opacity != null ? paint.opacity : 1;
             const parts = style.name.split("/");
             let obj = styleTokens;
             for (let i = 0; i < parts.length - 1; i++) {
               if (!obj[parts[i]]) obj[parts[i]] = {};
               obj = obj[parts[i]];
             }
-            obj[parts[parts.length - 1]] = { type: "COLOR", value: `#${r}${g}${b}` };
+            obj[parts[parts.length - 1]] = {
+              type: "COLOR",
+              value: formatColor(__spreadProps(__spreadValues({}, paint.color), { a }), colorFormat)
+            };
           }
         }
         if (Object.keys(styleTokens).length > 0) {
@@ -1403,8 +1682,9 @@ ${p.code}
         frame.y = p.y != null ? p.y : 0;
         if (p.name) frame.name = p.name;
         if (p.fillColor) frame.fills = [makeSolidPaint(p.fillColor)];
-        applyAutoLayout(frame, p);
         parent.appendChild(frame);
+        applyAutoLayout(frame, p);
+        applyLayoutSizing(frame, p);
         figma.commitUndo();
         return {
           type: request2.type,
@@ -1510,14 +1790,7 @@ ${p.code}
           component.cornerRadius = node.cornerRadius;
         }
         if (node.layoutMode && node.layoutMode !== "NONE") {
-          component.layoutMode = node.layoutMode;
-          component.paddingTop = node.paddingTop;
-          component.paddingRight = node.paddingRight;
-          component.paddingBottom = node.paddingBottom;
-          component.paddingLeft = node.paddingLeft;
-          component.itemSpacing = node.itemSpacing;
-          component.primaryAxisAlignItems = node.primaryAxisAlignItems;
-          component.counterAxisAlignItems = node.counterAxisAlignItems;
+          applyAutoLayout(component, node);
         }
         for (const child of [...node.children]) {
           component.appendChild(child);
@@ -1778,18 +2051,42 @@ ${p.code}
       case "set_auto_layout": {
         const p = request2.params || {};
         assertNotFigjam("set_auto_layout");
-        const nodeId = request2.nodeIds && request2.nodeIds[0];
-        if (!nodeId) throw new Error("nodeId is required");
-        const node = yield figma.getNodeByIdAsync(nodeId);
-        if (!node) throw new Error(`Node not found: ${nodeId}`);
-        if (node.type !== "FRAME") throw new Error(`Node ${nodeId} is not a FRAME`);
-        applyAutoLayout(node, p);
+        const nodeIds = request2.nodeIds || [];
+        if (nodeIds.length === 0) throw new Error("nodeIds is required");
+        const results = [];
+        for (const nid of nodeIds) {
+          const n = yield figma.getNodeByIdAsync(nid);
+          if (!n) {
+            results.push({ nodeId: nid, error: "Node not found" });
+            continue;
+          }
+          const isContainer = "layoutMode" in n;
+          const isChild = "layoutSizingHorizontal" in n;
+          if (!isContainer && !isChild) {
+            results.push({ nodeId: nid, error: `Node ${nid} does not support auto layout` });
+            continue;
+          }
+          if (!isContainer && p.layoutMode != null) {
+            results.push({
+              nodeId: nid,
+              error: "Node does not support auto layout — only frames, components and instances have layoutMode"
+            });
+            continue;
+          }
+          try {
+            if (isContainer) applyAutoLayout(n, p);
+            if (isChild) applyLayoutSizing(n, p);
+            const entry = { nodeId: nid, name: n.name };
+            if (isContainer) entry.layoutMode = n.layoutMode;
+            if (isChild && p.layoutSizingHorizontal) entry.layoutSizingHorizontal = n.layoutSizingHorizontal;
+            if (isChild && p.layoutSizingVertical) entry.layoutSizingVertical = n.layoutSizingVertical;
+            results.push(entry);
+          } catch (e) {
+            results.push({ nodeId: nid, error: e instanceof Error ? e.message : String(e) });
+          }
+        }
         figma.commitUndo();
-        return {
-          type: request2.type,
-          requestId: request2.requestId,
-          data: { id: node.id, name: node.name }
-        };
+        return { type: request2.type, requestId: request2.requestId, data: { results } };
       }
       case "set_visible": {
         const p = request2.params || {};
@@ -2047,8 +2344,99 @@ ${p.code}
         return null;
     }
   });
+  const STYLE_FIELDS = {
+    PAINT: ["name", "description", "color"],
+    TEXT: [
+      "name",
+      "description",
+      "fontFamily",
+      "fontStyle",
+      "fontSize",
+      "textDecoration",
+      "lineHeightValue",
+      "lineHeightUnit",
+      "letterSpacingValue",
+      "letterSpacingUnit"
+    ],
+    EFFECT: ["name", "description", "effects"],
+    GRID: [
+      "name",
+      "description",
+      "pattern",
+      "count",
+      "gutterSize",
+      "offset",
+      "alignment",
+      "sectionSize",
+      "color",
+      "opacity"
+    ]
+  };
+  const STYLE_BINDABLE_FIELDS = {
+    PAINT: ["color"],
+    TEXT: [
+      "fontFamily",
+      "fontSize",
+      "fontStyle",
+      "fontWeight",
+      "letterSpacing",
+      "lineHeight",
+      "paragraphSpacing",
+      "paragraphIndent"
+    ],
+    EFFECT: ["color", "radius", "spread", "offsetX", "offsetY"],
+    GRID: ["sectionSize", "count", "offset", "gutterSize"]
+  };
+  const buildEffect = (e) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    switch (e.type) {
+      case "DROP_SHADOW":
+      case "INNER_SHADOW": {
+        const { r, g, b } = parseColor(e.color || "#000000");
+        return {
+          type: e.type,
+          color: { r, g, b, a: e.opacity != null ? Number(e.opacity) : 0.25 },
+          offset: { x: Number((_a = e.offsetX) != null ? _a : 0), y: Number((_b = e.offsetY) != null ? _b : 4) },
+          radius: Number((_c = e.radius) != null ? _c : 4),
+          spread: Number((_d = e.spread) != null ? _d : 0),
+          visible: (_e = e.visible) != null ? _e : true,
+          blendMode: e.blendMode || "NORMAL"
+        };
+      }
+      case "LAYER_BLUR":
+      case "BACKGROUND_BLUR":
+        return {
+          type: e.type,
+          radius: Number((_f = e.radius) != null ? _f : 4),
+          visible: (_g = e.visible) != null ? _g : true
+        };
+      default:
+        throw new Error(`Unknown effect type: ${e.type}. Must be DROP_SHADOW, INNER_SHADOW, LAYER_BLUR, or BACKGROUND_BLUR`);
+    }
+  };
+  const buildLayoutGrid = (p) => {
+    var _a, _b, _c, _d;
+    const pattern = p.pattern || "GRID";
+    if (pattern === "COLUMNS" || pattern === "ROWS") {
+      return {
+        pattern,
+        count: Number((_a = p.count) != null ? _a : 12),
+        gutterSize: Number((_b = p.gutterSize) != null ? _b : 16),
+        offset: Number((_c = p.offset) != null ? _c : 0),
+        alignment: p.alignment || "STRETCH",
+        visible: true
+      };
+    }
+    const { r, g, b, a } = parseColor(p.color || "#FF0000");
+    return {
+      pattern: "GRID",
+      sectionSize: Number((_d = p.sectionSize) != null ? _d : 8),
+      visible: true,
+      color: { r, g, b, a: p.opacity != null ? Number(p.opacity) : a !== 1 ? a : 0.1 }
+    };
+  };
   const handleWriteStyleRequest = (request2) => __async(null, null, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f;
     switch (request2.type) {
       case "create_paint_style": {
         assertNotFigjam("create_paint_style");
@@ -2117,7 +2505,7 @@ ${p.code}
         } else if (effectType === "BACKGROUND_BLUR") {
           effect = { type: "BACKGROUND_BLUR", blurType: "NORMAL", radius: Number((_b = p.radius) != null ? _b : 4), visible: true };
         } else {
-          const { r, g, b, a } = hexToRgb(p.color || "#000000");
+          const { r, g, b, a } = parseColor(p.color || "#000000");
           const alpha = p.opacity != null ? Number(p.opacity) : a !== 1 ? a : 0.25;
           effect = {
             type: effectType,
@@ -2148,26 +2536,7 @@ ${p.code}
         if (existing) {
           return { type: request2.type, requestId: request2.requestId, data: { id: existing.id, name: existing.name } };
         }
-        const pattern = p.pattern || "GRID";
-        let grid;
-        if (pattern === "COLUMNS" || pattern === "ROWS") {
-          grid = {
-            pattern,
-            count: Number((_g = p.count) != null ? _g : 12),
-            gutterSize: Number((_h = p.gutterSize) != null ? _h : 16),
-            offset: Number((_i = p.offset) != null ? _i : 0),
-            alignment: p.alignment || "STRETCH",
-            visible: true
-          };
-        } else {
-          const { r, g, b, a } = hexToRgb(p.color || "#FF0000");
-          grid = {
-            pattern: "GRID",
-            sectionSize: Number((_j = p.sectionSize) != null ? _j : 8),
-            visible: true,
-            color: { r, g, b, a: p.opacity != null ? Number(p.opacity) : a !== 1 ? a : 0.1 }
-          };
-        }
+        const grid = buildLayoutGrid(p);
         const style = figma.createGridStyle();
         style.name = p.name;
         style.layoutGrids = [grid];
@@ -2179,21 +2548,134 @@ ${p.code}
           data: { id: style.id, name: style.name }
         };
       }
-      case "update_paint_style": {
+      case "update_style": {
         const p = request2.params || {};
-        assertNotFigjam("update_paint_style");
+        assertNotFigjam("update_style");
         if (!p.styleId) throw new Error("styleId is required");
         const style = yield figma.getStyleByIdAsync(p.styleId);
         if (!style) throw new Error(`Style not found: ${p.styleId}`);
-        if (style.type !== "PAINT") throw new Error(`Style ${p.styleId} is not a paint style`);
-        if (p.name) style.name = p.name;
-        if (p.color) style.paints = [makeSolidPaint(p.color)];
+        const allowed = STYLE_FIELDS[style.type];
+        if (!allowed) throw new Error(`Unknown style type: ${style.type}`);
+        for (const key of Object.keys(p)) {
+          if (key !== "styleId" && !allowed.includes(key)) {
+            throw new Error(`${key} is not applicable to a ${style.type} style`);
+          }
+        }
+        if (p.name != null) style.name = p.name;
         if (p.description != null) style.description = p.description;
+        if (style.type === "PAINT") {
+          if (p.color != null) style.paints = [makeSolidPaint(p.color)];
+        } else if (style.type === "TEXT") {
+          const text = style;
+          if (p.fontFamily != null || p.fontStyle != null) {
+            const family = p.fontFamily != null ? p.fontFamily : text.fontName.family;
+            const fontStyle = p.fontStyle != null ? p.fontStyle : text.fontName.style;
+            yield figma.loadFontAsync({ family, style: fontStyle });
+            text.fontName = { family, style: fontStyle };
+          }
+          if (p.fontSize != null) text.fontSize = Number(p.fontSize);
+          if (p.textDecoration != null) text.textDecoration = p.textDecoration;
+          if (p.lineHeightValue != null) {
+            text.lineHeight = { value: Number(p.lineHeightValue), unit: p.lineHeightUnit || "PIXELS" };
+          }
+          if (p.letterSpacingValue != null) {
+            text.letterSpacing = { value: Number(p.letterSpacingValue), unit: p.letterSpacingUnit || "PIXELS" };
+          }
+        } else if (style.type === "EFFECT") {
+          if (p.effects != null) {
+            if (!Array.isArray(p.effects)) throw new Error("effects array is required");
+            style.effects = p.effects.map(buildEffect);
+          }
+        } else {
+          const gridStyle = style;
+          const current = gridStyle.layoutGrids[0];
+          if (p.pattern != null || !current) {
+            gridStyle.layoutGrids = [buildLayoutGrid(p)];
+          } else {
+            const next = __spreadValues({}, current);
+            if (p.count != null) next.count = Number(p.count);
+            if (p.gutterSize != null) next.gutterSize = Number(p.gutterSize);
+            if (p.offset != null) next.offset = Number(p.offset);
+            if (p.alignment != null) next.alignment = p.alignment;
+            if (p.sectionSize != null) next.sectionSize = Number(p.sectionSize);
+            if (p.color != null || p.opacity != null) {
+              const base = p.color != null ? parseColor(p.color) : __spreadValues({}, current.color || { r: 1, g: 0, b: 0, a: 0.1 });
+              next.color = {
+                r: base.r,
+                g: base.g,
+                b: base.b,
+                a: p.opacity != null ? Number(p.opacity) : base.a
+              };
+            }
+            gridStyle.layoutGrids = [next];
+          }
+        }
         figma.commitUndo();
         return {
           type: request2.type,
           requestId: request2.requestId,
-          data: { id: style.id, name: style.name }
+          data: { id: style.id, name: style.name, type: style.type }
+        };
+      }
+      case "bind_variable_to_style": {
+        const p = request2.params || {};
+        assertNotFigjam("bind_variable_to_style");
+        if (!p.styleId) throw new Error("styleId is required");
+        if (!p.field) throw new Error("field is required");
+        const style = yield figma.getStyleByIdAsync(p.styleId);
+        if (!style) throw new Error(`Style not found: ${p.styleId}`);
+        const variable = p.variableId ? yield figma.variables.getVariableByIdAsync(p.variableId) : null;
+        if (p.variableId && !variable) throw new Error(`Variable not found: ${p.variableId}`);
+        const bindable = STYLE_BINDABLE_FIELDS[style.type];
+        if (!bindable) throw new Error(`Unknown style type: ${style.type}`);
+        if (!bindable.includes(p.field)) {
+          throw new Error(
+            `field ${p.field} is not bindable on a ${style.type} style — expected ${bindable.join(", ")}`
+          );
+        }
+        if (style.type === "PAINT") {
+          const paintStyle = style;
+          const paints = [...paintStyle.paints];
+          const base = paints.length > 0 ? paints[0] : makeSolidPaint("#000000");
+          if (base.type !== "SOLID") {
+            throw new Error(`Style ${p.styleId} paint 0 is ${base.type}, not SOLID`);
+          }
+          paints[0] = figma.variables.setBoundVariableForPaint(base, "color", variable);
+          paintStyle.paints = paints;
+        } else if (style.type === "TEXT") {
+          style.setBoundVariable(p.field, variable);
+        } else if (style.type === "EFFECT") {
+          const effectStyle = style;
+          const effects = [...effectStyle.effects];
+          if (effects.length === 0) throw new Error(`Style ${p.styleId} has no effects to bind`);
+          effects[0] = figma.variables.setBoundVariableForEffect(
+            effects[0],
+            p.field,
+            variable
+          );
+          effectStyle.effects = effects;
+        } else {
+          const gridStyle = style;
+          const grids = [...gridStyle.layoutGrids];
+          if (grids.length === 0) throw new Error(`Style ${p.styleId} has no layout grids to bind`);
+          grids[0] = figma.variables.setBoundVariableForLayoutGrid(
+            grids[0],
+            p.field,
+            variable
+          );
+          gridStyle.layoutGrids = grids;
+        }
+        figma.commitUndo();
+        return {
+          type: request2.type,
+          requestId: request2.requestId,
+          data: {
+            styleId: style.id,
+            styleType: style.type,
+            field: p.field,
+            variableId: p.variableId != null ? p.variableId : null,
+            bound: variable !== null
+          }
         };
       }
       case "delete_style": {
@@ -2264,33 +2746,7 @@ ${p.code}
         const node = yield figma.getNodeByIdAsync(nodeId);
         if (!node) throw new Error(`Node not found: ${nodeId}`);
         if (!("effects" in node)) throw new Error(`Node ${nodeId} does not support effects`);
-        const effects = p.effects.map((e) => {
-          var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
-          switch (e.type) {
-            case "DROP_SHADOW":
-            case "INNER_SHADOW": {
-              const { r, g, b } = hexToRgb(e.color || "#000000");
-              return {
-                type: e.type,
-                color: { r, g, b, a: e.opacity != null ? Number(e.opacity) : 0.25 },
-                offset: { x: Number((_a2 = e.offsetX) != null ? _a2 : 0), y: Number((_b2 = e.offsetY) != null ? _b2 : 4) },
-                radius: Number((_c2 = e.radius) != null ? _c2 : 4),
-                spread: Number((_d2 = e.spread) != null ? _d2 : 0),
-                visible: (_e2 = e.visible) != null ? _e2 : true,
-                blendMode: e.blendMode || "NORMAL"
-              };
-            }
-            case "LAYER_BLUR":
-            case "BACKGROUND_BLUR":
-              return {
-                type: e.type,
-                radius: Number((_f2 = e.radius) != null ? _f2 : 4),
-                visible: (_g2 = e.visible) != null ? _g2 : true
-              };
-            default:
-              throw new Error(`Unknown effect type: ${e.type}. Must be DROP_SHADOW, INNER_SHADOW, LAYER_BLUR, or BACKGROUND_BLUR`);
-          }
-        });
+        const effects = p.effects.map(buildEffect);
         node.effects = effects;
         figma.commitUndo();
         return {
@@ -2304,24 +2760,25 @@ ${p.code}
         assertNotFigjam("bind_variable_to_node");
         const nodeId = request2.nodeIds && request2.nodeIds[0];
         if (!nodeId) throw new Error("nodeId is required");
-        if (!p.variableId) throw new Error("variableId is required");
         if (!p.field) throw new Error("field is required");
         const node = yield figma.getNodeByIdAsync(nodeId);
         if (!node) throw new Error(`Node not found: ${nodeId}`);
-        const variable = yield figma.variables.getVariableByIdAsync(p.variableId);
-        if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
+        const variable = p.variableId ? yield figma.variables.getVariableByIdAsync(p.variableId) : null;
+        if (p.variableId && !variable) throw new Error(`Variable not found: ${p.variableId}`);
         if (p.field === "fillColor") {
           if (!("fills" in node)) throw new Error(`Node ${nodeId} does not support fills`);
           const fills = [...node.fills];
           const base = fills.length > 0 ? fills[0] : makeSolidPaint("#000000");
-          const paint = figma.variables.setBoundVariableForPaint(base, "color", variable);
-          node.fills = [paint];
+          if (base.type !== "SOLID") throw new Error(`Node ${nodeId} fill 0 is ${base.type}, not SOLID`);
+          fills[0] = figma.variables.setBoundVariableForPaint(base, "color", variable);
+          node.fills = fills;
         } else if (p.field === "strokeColor") {
           if (!("strokes" in node)) throw new Error(`Node ${nodeId} does not support strokes`);
           const strokes = [...node.strokes];
           const base = strokes.length > 0 ? strokes[0] : makeSolidPaint("#000000");
-          const paint = figma.variables.setBoundVariableForPaint(base, "color", variable);
-          node.strokes = [paint];
+          if (base.type !== "SOLID") throw new Error(`Node ${nodeId} stroke 0 is ${base.type}, not SOLID`);
+          strokes[0] = figma.variables.setBoundVariableForPaint(base, "color", variable);
+          node.strokes = strokes;
         } else {
           if (!(p.field in node)) throw new Error(`Node ${nodeId} does not have field: ${p.field}`);
           node.setBoundVariable(p.field, variable);
@@ -2330,7 +2787,13 @@ ${p.code}
         return {
           type: request2.type,
           requestId: request2.requestId,
-          data: { id: node.id, name: node.name, variableId: p.variableId, field: p.field }
+          data: {
+            id: node.id,
+            name: node.name,
+            variableId: p.variableId != null ? p.variableId : null,
+            field: p.field,
+            bound: variable !== null
+          }
         };
       }
       default:
@@ -2340,7 +2803,7 @@ ${p.code}
   const parseVariableValue = (type, value) => {
     if (type === "COLOR") {
       if (typeof value === "string") {
-        const { r, g, b, a } = hexToRgb(value);
+        const { r, g, b, a } = parseColor(value);
         return { r, g, b, a };
       }
       return value;
@@ -2348,6 +2811,14 @@ ${p.code}
     if (type === "FLOAT") return typeof value === "number" ? value : parseFloat(String(value));
     if (type === "BOOLEAN") return value === true || value === "true";
     return String(value);
+  };
+  const resolveVariableValue = (type, p) => __async(null, null, function* () {
+    return p.aliasVariableId ? figma.variables.createVariableAliasByIdAsync(p.aliasVariableId) : parseVariableValue(type, p.value);
+  });
+  const CODE_SYNTAX_PLATFORMS = {
+    codeSyntaxWeb: "WEB",
+    codeSyntaxAndroid: "ANDROID",
+    codeSyntaxIos: "iOS"
   };
   const handleWriteVariableRequest = (request2) => __async(null, null, function* () {
     switch (request2.type) {
@@ -2397,9 +2868,9 @@ ${p.code}
         const collection = yield figma.variables.getVariableCollectionByIdAsync(p.collectionId);
         if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
         const variable = figma.variables.createVariable(p.name, collection, p.type);
-        if (p.value != null && collection.modes.length > 0) {
+        if ((p.value != null || p.aliasVariableId) && collection.modes.length > 0) {
           const modeId = collection.modes[0].modeId;
-          variable.setValueForMode(modeId, parseVariableValue(p.type, p.value));
+          variable.setValueForMode(modeId, yield resolveVariableValue(p.type, p));
         }
         figma.commitUndo();
         return {
@@ -2418,20 +2889,112 @@ ${p.code}
         assertNotFigjam("set_variable_value");
         if (!p.variableId) throw new Error("variableId is required");
         if (!p.modeId) throw new Error("modeId is required");
-        if (p.value == null) throw new Error("value is required");
+        if (p.value == null && !p.aliasVariableId) {
+          throw new Error("value or aliasVariableId is required");
+        }
         const variable = yield figma.variables.getVariableByIdAsync(p.variableId);
         if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
-        variable.setValueForMode(p.modeId, parseVariableValue(variable.resolvedType, p.value));
+        variable.setValueForMode(
+          p.modeId,
+          yield resolveVariableValue(variable.resolvedType, p)
+        );
         figma.commitUndo();
         return {
           type: request2.type,
           requestId: request2.requestId,
-          data: { variableId: variable.id, name: variable.name, modeId: p.modeId }
+          data: {
+            variableId: variable.id,
+            name: variable.name,
+            modeId: p.modeId,
+            alias: p.aliasVariableId != null ? p.aliasVariableId : null
+          }
+        };
+      }
+      case "update_variable": {
+        const p = request2.params || {};
+        assertNotFigjam("update_variable");
+        if (p.variableId) {
+          const variable = yield figma.variables.getVariableByIdAsync(p.variableId);
+          if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
+          if (p.name != null) variable.name = p.name;
+          if (p.description != null) variable.description = p.description;
+          if (p.scopes != null) variable.scopes = p.scopes;
+          if (p.hiddenFromPublishing != null) variable.hiddenFromPublishing = !!p.hiddenFromPublishing;
+          for (const key of Object.keys(CODE_SYNTAX_PLATFORMS)) {
+            if (p[key] != null) variable.setVariableCodeSyntax(CODE_SYNTAX_PLATFORMS[key], p[key]);
+          }
+          figma.commitUndo();
+          return {
+            type: request2.type,
+            requestId: request2.requestId,
+            data: {
+              variableId: variable.id,
+              name: variable.name,
+              scopes: variable.scopes,
+              codeSyntax: variable.codeSyntax
+            }
+          };
+        }
+        if (p.collectionId) {
+          const collection = yield figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+          if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+          if (p.name != null) collection.name = p.name;
+          if (p.hiddenFromPublishing != null) collection.hiddenFromPublishing = !!p.hiddenFromPublishing;
+          if (p.modeId && p.modeName) collection.renameMode(p.modeId, p.modeName);
+          figma.commitUndo();
+          return {
+            type: request2.type,
+            requestId: request2.requestId,
+            data: {
+              collectionId: collection.id,
+              name: collection.name,
+              modes: collection.modes.map((m) => ({ modeId: m.modeId, name: m.name }))
+            }
+          };
+        }
+        throw new Error("variableId or collectionId is required");
+      }
+      case "set_variable_mode": {
+        const p = request2.params || {};
+        assertNotFigjam("set_variable_mode");
+        if (!p.collectionId) throw new Error("collectionId is required");
+        const collection = yield figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+        if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+        const nodeId = request2.nodeIds && request2.nodeIds[0];
+        const target = nodeId ? yield figma.getNodeByIdAsync(nodeId) : figma.currentPage;
+        if (!target) throw new Error(`Node not found: ${nodeId}`);
+        if (!("setExplicitVariableModeForCollection" in target)) {
+          throw new Error(`Node ${nodeId} does not support variable modes`);
+        }
+        if (p.modeId) target.setExplicitVariableModeForCollection(collection, p.modeId);
+        else target.clearExplicitVariableModeForCollection(collection);
+        figma.commitUndo();
+        return {
+          type: request2.type,
+          requestId: request2.requestId,
+          data: {
+            id: target.id,
+            name: target.name,
+            collectionId: collection.id,
+            modeId: p.modeId != null ? p.modeId : null,
+            cleared: !p.modeId
+          }
         };
       }
       case "delete_variable": {
         const p = request2.params || {};
         assertNotFigjam("delete_variable");
+        if (p.collectionId && p.modeId) {
+          const collection = yield figma.variables.getVariableCollectionByIdAsync(p.collectionId);
+          if (!collection) throw new Error(`Collection not found: ${p.collectionId}`);
+          collection.removeMode(p.modeId);
+          figma.commitUndo();
+          return {
+            type: request2.type,
+            requestId: request2.requestId,
+            data: { collectionId: p.collectionId, modeId: p.modeId, deleted: true }
+          };
+        }
         if (p.variableId) {
           const variable = yield figma.variables.getVariableByIdAsync(p.variableId);
           if (!variable) throw new Error(`Variable not found: ${p.variableId}`);
@@ -2798,6 +3361,7 @@ ${code}
   const handleRequest = (request2) => __async(null, null, function* () {
     var _a, _b, _c;
     const req = request2;
+    clearVariableNameCache();
     try {
       const result2 = (_c = (_b = (_a = yield handleExecuteRequest(request2)) != null ? _a : yield handleFigjamToolRequest(request2)) != null ? _b : yield handleReadRequest(request2)) != null ? _c : yield handleWriteRequest(request2);
       if (result2 === null)

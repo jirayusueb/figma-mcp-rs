@@ -38,11 +38,11 @@ Workflows: see the figjam-boards skill.
 
 Calling these in a FigJam file errors "not available in FigJam":
 - Styles: create_paint_style, create_text_style, create_effect_style,
-  create_grid_style, update_paint_style, delete_style, apply_style_to_node,
-  set_effects.
+  create_grid_style, update_style, delete_style, apply_style_to_node,
+  set_effects, bind_variable_to_style.
 - Variables: create_variable_collection, add_variable_mode,
-  create_variable, set_variable_value, bind_variable_to_node,
-  delete_variable.
+  create_variable, set_variable_value, update_variable, set_variable_mode,
+  bind_variable_to_node, delete_variable.
 - Components: create_component, swap_component, detach_instance.
 - Prototype: set_reactions, remove_reactions.
 - Layout: set_auto_layout.

@@ -1,18 +1,10 @@
 // Write helpers — utilities used exclusively by write handlers.
 
-export const hexToRgb = (hex: string) => {
-  const clean = hex.replace("#", "");
-  return {
-    r: parseInt(clean.slice(0, 2), 16) / 255,
-    g: parseInt(clean.slice(2, 4), 16) / 255,
-    b: parseInt(clean.slice(4, 6), 16) / 255,
-    a: clean.length >= 8 ? parseInt(clean.slice(6, 8), 16) / 255 : 1,
-  };
-};
+import { parseColor } from "./color";
 
 export const makeSolidPaint = (colorInput: any, opacityOverride?: number): SolidPaint => {
   const { r, g, b, a } = typeof colorInput === "string"
-    ? hexToRgb(colorInput)
+    ? parseColor(colorInput)
     : { r: colorInput.r, g: colorInput.g, b: colorInput.b, a: colorInput.a != null ? colorInput.a : 1 };
   const eff = opacityOverride != null ? opacityOverride : a;
   const paint: any = { type: "SOLID", color: { r, g, b } };
@@ -28,7 +20,31 @@ export const getParentNode = async (parentId: string | undefined) => {
   return parent as ChildrenMixin & BaseNode;
 };
 
-export const applyAutoLayout = (frame: FrameNode, p: any) => {
+// Container-level auto-layout properties, typed straight off the Figma mixin so
+// params and target node share one definition.
+export type AutoLayoutProps = Pick<
+  AutoLayoutMixin,
+  | "layoutMode"
+  | "paddingTop"
+  | "paddingRight"
+  | "paddingBottom"
+  | "paddingLeft"
+  | "itemSpacing"
+  | "primaryAxisAlignItems"
+  | "counterAxisAlignItems"
+  | "primaryAxisSizingMode"
+  | "counterAxisSizingMode"
+  | "layoutWrap"
+  | "counterAxisSpacing"
+  | "counterAxisAlignContent"
+  | "itemReverseZIndex"
+  | "strokesIncludedInLayout"
+>;
+
+export type LayoutSizingProps = Pick<LayoutMixin, "layoutSizingHorizontal" | "layoutSizingVertical"> &
+  Pick<AutoLayoutChildrenMixin, "layoutPositioning">;
+
+export const applyAutoLayout = (frame: AutoLayoutProps, p: Partial<AutoLayoutProps>) => {
   if (p.layoutMode != null) frame.layoutMode = p.layoutMode;
   if (p.paddingTop != null) frame.paddingTop = Number(p.paddingTop);
   if (p.paddingRight != null) frame.paddingRight = Number(p.paddingRight);
@@ -44,7 +60,21 @@ export const applyAutoLayout = (frame: FrameNode, p: any) => {
     if (p.counterAxisSpacing != null && frame.layoutWrap === "WRAP") {
       frame.counterAxisSpacing = Number(p.counterAxisSpacing);
     }
+    if (p.counterAxisAlignContent && frame.layoutWrap === "WRAP") {
+      frame.counterAxisAlignContent = p.counterAxisAlignContent;
+    }
+    if (p.itemReverseZIndex != null) frame.itemReverseZIndex = !!p.itemReverseZIndex;
+    if (p.strokesIncludedInLayout != null) frame.strokesIncludedInLayout = !!p.strokesIncludedInLayout;
   }
+};
+
+// Child-level layout properties. Separate from applyAutoLayout because these are
+// only valid once the node sits in its final parent, and create_component copies
+// container props off a source node where these must not be read.
+export const applyLayoutSizing = (node: LayoutSizingProps, p: Partial<LayoutSizingProps>) => {
+  if (p.layoutPositioning) node.layoutPositioning = p.layoutPositioning;
+  if (p.layoutSizingHorizontal) node.layoutSizingHorizontal = p.layoutSizingHorizontal;
+  if (p.layoutSizingVertical) node.layoutSizingVertical = p.layoutSizingVertical;
 };
 
 export const base64ToBytes = (b64: string) => {

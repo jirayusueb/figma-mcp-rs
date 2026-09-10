@@ -169,6 +169,34 @@ describe("bind_variable_to_node strokeColor", () => {
     expect(mockNodes["1:1"].strokes).toHaveLength(1);
   });
 
+  it("keeps the other fills when binding fillColor", async () => {
+    const extra = { type: "SOLID", color: { r: 0, g: 1, b: 0 } };
+    mockNodes["1:1"] = {
+      id: "1:1",
+      fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }, extra],
+      setBoundVariable: () => {},
+    };
+    await handleWriteStyleRequest(makeRequest("bind_variable_to_node", ["1:1"], {
+      variableId: "v1", field: "fillColor",
+    }));
+    expect(mockNodes["1:1"].fills).toHaveLength(2);
+    expect(mockNodes["1:1"].fills[1]).toBe(extra);
+  });
+
+  it("unbinds a field when variableId is omitted", async () => {
+    const calls: [string, unknown][] = [];
+    mockNodes["1:1"] = {
+      id: "1:1",
+      cornerRadius: 8,
+      setBoundVariable: (field: string, variable: unknown) => calls.push([field, variable]),
+    };
+    const res = await handleWriteStyleRequest(makeRequest("bind_variable_to_node", ["1:1"], {
+      field: "cornerRadius",
+    }));
+    expect(calls).toEqual([["cornerRadius", null]]);
+    expect(res?.data.bound).toBe(false);
+  });
+
   it("throws if node does not support strokes", async () => {
     mockNodes["1:1"] = { id: "1:1", name: "Text" }; // no strokes
     await expect(handleWriteStyleRequest(makeRequest("bind_variable_to_node", ["1:1"], {

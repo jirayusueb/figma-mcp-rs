@@ -10,8 +10,9 @@ Open-source MCP server with full read/write access to **Figma and FigJam** via p
 **Highlights**
 - No Figma API token required
 - No rate limits — free plan friendly
-- **Read and Write** live Figma/FigJam data via plugin bridge — 84 tools total (73 from the Go reference, plus `get_status`, `execute_code`, eight FigJam tools, and the `use_figma` escape hatch)
-- Full design automation — styles, variables, components, prototypes, and content
+- **Read and Write** live Figma/FigJam data via plugin bridge — 87 tools total (73 from the Go reference, plus `get_status`, `execute_code`, eight FigJam tools, the `use_figma` escape hatch, and four design-system tools: `update_style`, `update_variable`, `set_variable_mode`, `bind_variable_to_style`)
+- Full design automation — styles, variables (values, aliases, scopes, modes), components, prototypes, and content
+- Colors accepted anywhere as hex, `rgb()`, `hsl()`, or `oklch()`; `get_styles` and `export_tokens` emit any of them via `colorFormat`
 - Design strategies included — 12 MCP prompts built in
 - Native binary, fast startup, low memory
 - Plugin bundled in the binary — the server self-installs it on first run, no download step
@@ -124,7 +125,7 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 - **Reads** work in both: `get_document`/`get_design_context` serialize FigJam node types (STICKER, CONNECTOR, MARKER, WIDGET, EMBED, MEDIA…)
 - **FigJam writes** are eight named tools: `create_sticky`, `create_stickies`, `create_connector`, `create_shape_with_text`, `create_table`, `create_code_block`, `auto_arrange`, `get_board_contents`
 - **Figma-only tools** (styles, variables, components, prototype reactions, auto-layout) return a clear error in FigJam files
-- **Remaining gap** — Slides and anything else unwrapped: use `use_figma`
+- **Remaining gaps** — Slides, team-library variables/styles (`figma.teamLibrary.*`, `importVariableByKeyAsync`), and anything else unwrapped: use `use_figma`
 
 ## Available Tools
 
@@ -162,7 +163,7 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 | `set_strokes` | Set solid stroke color and weight on a node |
 | `set_opacity` | Set opacity of one or more nodes (0 = transparent, 1 = opaque) |
 | `set_corner_radius` | Set corner radius — uniform or per-corner |
-| `set_auto_layout` | Set or update auto-layout (flex) properties on a frame (Figma only) |
+| `set_auto_layout` | Set auto-layout properties on one or more nodes — direction, padding, gap, alignment, wrap, HUG/FILL sizing, absolute positioning (Figma only) |
 | `set_visible` | Show or hide one or more nodes |
 | `lock_nodes` / `unlock_nodes` | Lock/unlock one or more nodes |
 | `rotate_nodes` | Set absolute rotation in degrees on one or more nodes |
@@ -192,7 +193,8 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 |------|-------------|
 | `set_effects` | Apply drop shadow / blur effects directly on a node |
 | `create_paint_style` / `create_text_style` / `create_effect_style` / `create_grid_style` | Create named local styles |
-| `update_paint_style` | Rename or recolor an existing paint style |
+| `update_style` | Update any style in place — paint color, text font/size/spacing, effects, grid — plus name and description |
+| `bind_variable_to_style` | Bind a variable to a style so the style itself is token-driven |
 | `apply_style_to_node` | Apply an existing local style to a node |
 | `delete_style` | Delete any style by ID |
 
@@ -203,9 +205,11 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 | `create_variable_collection` | Create a new local variable collection with an optional initial mode |
 | `add_variable_mode` | Add a new mode to an existing collection (e.g. Light/Dark) |
 | `create_variable` | Create a variable (COLOR/FLOAT/STRING/BOOLEAN) in a collection |
-| `set_variable_value` | Set a variable's value for a specific mode |
-| `bind_variable_to_node` | Bind a variable to a node property (fills, strokes, size, spacing, …) |
-| `delete_variable` | Delete a variable or an entire collection |
+| `set_variable_value` | Set a variable's value for a mode — a literal or an alias to another variable |
+| `update_variable` | Rename a variable or collection; set description, scopes, Dev Mode code syntax; rename a mode |
+| `set_variable_mode` | Apply or clear a collection's mode override on a node or the current page |
+| `bind_variable_to_node` | Bind a variable to a node property (fills, strokes, size, spacing, …); omit `variableId` to unbind |
+| `delete_variable` | Delete a variable, an entire collection, or a single mode |
 
 ### Write — Pages
 
@@ -244,11 +248,11 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 
 | Tool | Description |
 |------|-------------|
-| `get_styles` | Paint, text, effect, and grid styles |
-| `get_variable_defs` | Variable collections and values |
+| `get_styles` | Paint, text, effect, and grid styles — with descriptions, publish state, bound variables, and `colorFormat` |
+| `get_variable_defs` | Variable collections, modes, values, aliases, scopes, and code syntax |
 | `get_local_components` | All components + component sets |
 | `get_annotations` | Dev-mode annotations |
-| `export_tokens` | Design tokens (variables + paint styles) as JSON or CSS |
+| `export_tokens` | Design tokens (variables + paint styles) as JSON or CSS, with alias `var()` references and `colorFormat` |
 
 ### Export
 

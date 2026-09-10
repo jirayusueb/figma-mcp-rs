@@ -4,6 +4,7 @@ import { handleExecuteRequest } from "./execute";
 import { handleFigjamToolRequest } from "./figjam-tools";
 import { handleReadRequest } from "./read-handlers";
 import { handleWriteRequest } from "./write-handlers";
+import { clearVariableNameCache } from "./serializers";
 
 const sendStatus = () => {
   figma.ui.postMessage({
@@ -17,6 +18,7 @@ const sendStatus = () => {
 };
 const handleRequest = async (request: unknown) => {
   const req = request as { type?: string; requestId?: string };
+  clearVariableNameCache();
   try {
     const result =
       (await handleExecuteRequest(request as any)) ??

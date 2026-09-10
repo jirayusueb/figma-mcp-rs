@@ -1,8 +1,39 @@
-import { serializeVariableValue } from "./serializers";
+import {
+  serializeBoundVariables,
+  serializeVariableValue,
+  variableName,
+  withAliasName,
+} from "./serializers";
+import { formatColor, type ColorFormat } from "./color";
+
+const cssVarName = (name: string) =>
+  "--" + name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+// Replaces the raw {r,g,b} / {r,g,b,a} on each paint, effect, or layout grid with
+// a formatted string. Paints carry their alpha in `opacity`; effects and grids
+// carry it on the color itself. Entries with no color (gradients, images, column
+// grids) pass through untouched.
+const formatColors = (items: readonly any[], colorFormat: ColorFormat) =>
+  items.map((item) => {
+    if (!item || typeof item !== "object" || !item.color) return item;
+    const a = item.color.a != null ? item.color.a : item.opacity != null ? item.opacity : 1;
+    return { ...item, color: formatColor({ ...item.color, a }, colorFormat) };
+  });
+
+const styleMeta = async (style: BaseStyle) => ({
+  id: style.id,
+  name: style.name,
+  description: style.description || undefined,
+  remote: style.remote,
+  key: style.key,
+  boundVariables: await serializeBoundVariables(style as any),
+});
 
 export const handleReadStyleRequest = async (request: any) => {
   switch (request.type) {
     case "get_styles": {
+      const colorFormat = ((request.params && request.params.colorFormat) ||
+        "hex") as ColorFormat;
       const [paintStyles, textStyles, effectStyles, gridStyles] =
         await Promise.all([
           figma.getLocalPaintStylesAsync(),
@@ -14,32 +45,36 @@ export const handleReadStyleRequest = async (request: any) => {
         type: request.type,
         requestId: request.requestId,
         data: {
-          paints: paintStyles.map((s) => ({
-            id: s.id,
-            name: s.name,
-            paints: s.paints,
-          })),
-          text: textStyles.map((s) => ({
-            id: s.id,
-            name: s.name,
-            fontSize: s.fontSize,
-            fontFamily: s.fontName ? s.fontName.family : undefined,
-            fontStyle: s.fontName ? s.fontName.style : undefined,
-            textDecoration:
-              s.textDecoration !== "NONE" ? s.textDecoration : undefined,
-            lineHeight: (s as any).lineHeight,
-            letterSpacing: (s as any).letterSpacing,
-          })),
-          effects: effectStyles.map((s) => ({
-            id: s.id,
-            name: s.name,
-            effects: s.effects,
-          })),
-          grids: gridStyles.map((s) => ({
-            id: s.id,
-            name: s.name,
-            layoutGrids: s.layoutGrids,
-          })),
+          paints: await Promise.all(
+            paintStyles.map(async (s) => ({
+              ...(await styleMeta(s)),
+              paints: formatColors(s.paints, colorFormat),
+            })),
+          ),
+          text: await Promise.all(
+            textStyles.map(async (s) => ({
+              ...(await styleMeta(s)),
+              fontSize: s.fontSize,
+              fontFamily: s.fontName ? s.fontName.family : undefined,
+              fontStyle: s.fontName ? s.fontName.style : undefined,
+              textDecoration:
+                s.textDecoration !== "NONE" ? s.textDecoration : undefined,
+              lineHeight: (s as any).lineHeight,
+              letterSpacing: (s as any).letterSpacing,
+            })),
+          ),
+          effects: await Promise.all(
+            effectStyles.map(async (s) => ({
+              ...(await styleMeta(s)),
+              effects: formatColors(s.effects, colorFormat),
+            })),
+          ),
+          grids: await Promise.all(
+            gridStyles.map(async (s) => ({
+              ...(await styleMeta(s)),
+              layoutGrids: formatColors(s.layoutGrids, colorFormat),
+            })),
+          ),
         },
       };
     }
@@ -57,25 +92,40 @@ export const handleReadStyleRequest = async (request: any) => {
           return {
             id: collection.id,
             name: collection.name,
+            defaultModeId: collection.defaultModeId,
+            remote: collection.remote,
+            hiddenFromPublishing: collection.hiddenFromPublishing,
+            key: collection.key,
             modes: collection.modes.map((mode) => ({
               modeId: mode.modeId,
               name: mode.name,
             })),
-            variables: variables
-              .filter((v) => v !== null)
-              .map((variable) => ({
-                id: variable!.id,
-                name: variable!.name,
-                resolvedType: variable!.resolvedType,
-                valuesByMode: Object.fromEntries(
-                  Object.entries(variable!.valuesByMode).map(
-                    ([modeId, value]) => [
-                      modeId,
-                      serializeVariableValue(value),
-                    ],
+            variables: await Promise.all(
+              variables
+                .filter((v) => v !== null)
+                .map(async (variable) => ({
+                  id: variable!.id,
+                  name: variable!.name,
+                  resolvedType: variable!.resolvedType,
+                  description: variable!.description || undefined,
+                  scopes: variable!.scopes,
+                  codeSyntax: variable!.codeSyntax,
+                  hiddenFromPublishing: variable!.hiddenFromPublishing,
+                  remote: variable!.remote,
+                  key: variable!.key,
+                  variableCollectionId: variable!.variableCollectionId,
+                  valuesByMode: Object.fromEntries(
+                    await Promise.all(
+                      Object.entries(variable!.valuesByMode).map(
+                        async ([modeId, value]) => [
+                          modeId,
+                          await withAliasName(serializeVariableValue(value)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              })),
+                })),
+            ),
           };
         }),
       );
@@ -182,6 +232,9 @@ export const handleReadStyleRequest = async (request: any) => {
 
     case "export_tokens": {
       const format = (request.params && request.params.format) || "json";
+      const requestedFormat = request.params && request.params.colorFormat;
+      const colorFormat = (requestedFormat ||
+        (format === "css" ? "rgb" : "hex")) as ColorFormat;
 
       const collections = await figma.variables.getLocalVariableCollectionsAsync();
       const paintStyles = await figma.getLocalPaintStylesAsync();
@@ -195,30 +248,24 @@ export const handleReadStyleRequest = async (request: any) => {
             const variable = await figma.variables.getVariableByIdAsync(varId);
             if (!variable) continue;
             const val = variable.valuesByMode[firstMode.modeId];
-            const cssName = "--" + variable.name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
             let cssValue: string | null = null;
-            if (variable.resolvedType === "COLOR" && val && typeof val === "object" && "r" in val) {
-              const c = val as RGBA;
-              const r = Math.round(c.r * 255);
-              const g = Math.round(c.g * 255);
-              const b = Math.round(c.b * 255);
-              cssValue = c.a < 1 ? `rgba(${r}, ${g}, ${b}, ${c.a.toFixed(2)})` : `rgb(${r}, ${g}, ${b})`;
+            if (val && typeof val === "object" && "type" in val && val.type === "VARIABLE_ALIAS") {
+              const target = await variableName(val.id);
+              if (target) cssValue = `var(${cssVarName(target)})`;
+            } else if (variable.resolvedType === "COLOR" && val && typeof val === "object" && "r" in val) {
+              cssValue = formatColor(val as RGBA, colorFormat);
             } else if (variable.resolvedType === "FLOAT" || variable.resolvedType === "STRING" || variable.resolvedType === "BOOLEAN") {
               cssValue = String(val);
             }
-            if (cssValue !== null) lines.push(`  ${cssName}: ${cssValue};`);
+            if (cssValue !== null) lines.push(`  ${cssVarName(variable.name)}: ${cssValue};`);
           }
         }
         for (const style of paintStyles) {
           if (style.paints.length === 1 && style.paints[0].type === "SOLID") {
             const paint = style.paints[0] as SolidPaint;
-            const cssName = "--" + style.name.toLowerCase().replace(/[/\s]+/g, "-").replace(/[^a-z0-9-]/g, "");
-            const r = Math.round(paint.color.r * 255);
-            const g = Math.round(paint.color.g * 255);
-            const b = Math.round(paint.color.b * 255);
-            const a = paint.opacity ?? 1;
-            const cssValue = a < 1 ? `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})` : `rgb(${r}, ${g}, ${b})`;
-            lines.push(`  ${cssName}: ${cssValue};`);
+            const a = paint.opacity != null ? paint.opacity : 1;
+            const cssValue = formatColor({ ...paint.color, a }, colorFormat);
+            lines.push(`  ${cssVarName(style.name)}: ${cssValue};`);
           }
         }
         lines.push("}");
@@ -234,7 +281,15 @@ export const handleReadStyleRequest = async (request: any) => {
           if (!variable) continue;
           const modeValues: any = {};
           for (const mode of coll.modes) {
-            modeValues[mode.name] = serializeVariableValue(variable.valuesByMode[mode.modeId]);
+            const serialized = await withAliasName(
+              serializeVariableValue(variable.valuesByMode[mode.modeId]),
+            );
+            const isColor =
+              !!serialized && typeof serialized === "object" && (serialized as any).type === "COLOR";
+            modeValues[mode.name] =
+              requestedFormat && isColor
+                ? formatColor(serialized as RGBA, colorFormat)
+                : serialized;
           }
           const parts = variable.name.split("/");
           let obj = collTokens;
@@ -250,16 +305,17 @@ export const handleReadStyleRequest = async (request: any) => {
       for (const style of paintStyles) {
           if (style.paints.length === 1 && style.paints[0].type === "SOLID") {
             const paint = style.paints[0] as SolidPaint;
-            const r = Math.round(paint.color.r * 255).toString(16).padStart(2, "0");
-            const g = Math.round(paint.color.g * 255).toString(16).padStart(2, "0");
-            const b = Math.round(paint.color.b * 255).toString(16).padStart(2, "0");
+            const a = paint.opacity != null ? paint.opacity : 1;
             const parts = style.name.split("/");
             let obj = styleTokens;
             for (let i = 0; i < parts.length - 1; i++) {
               if (!obj[parts[i]]) obj[parts[i]] = {};
               obj = obj[parts[i]];
             }
-            obj[parts[parts.length - 1]] = { type: "COLOR", value: `#${r}${g}${b}` };
+            obj[parts[parts.length - 1]] = {
+              type: "COLOR",
+              value: formatColor({ ...paint.color, a }, colorFormat),
+            };
           }
       }
       if (Object.keys(styleTokens).length > 0) {

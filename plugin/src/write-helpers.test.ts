@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import {
-  hexToRgb,
   makeSolidPaint,
   applyAutoLayout,
+  applyLayoutSizing,
   base64ToBytes,
   getParentNode,
+  type AutoLayoutProps,
+  type LayoutSizingProps,
 } from "./write-helpers";
 
 // ── Figma global mock ─────────────────────────────────────────────────────────
@@ -21,46 +23,6 @@ beforeEach(() => {
   };
 });
 
-// ── hexToRgb ──────────────────────────────────────────────────────────────────
-
-describe("hexToRgb", () => {
-  it("converts 6-char hex to rgb with alpha 1", () => {
-    const result = hexToRgb("#ff0000");
-    expect(result.r).toBeCloseTo(1);
-    expect(result.g).toBe(0);
-    expect(result.b).toBe(0);
-    expect(result.a).toBe(1);
-  });
-
-  it("converts black #000000", () => {
-    const result = hexToRgb("#000000");
-    expect(result.r).toBe(0);
-    expect(result.g).toBe(0);
-    expect(result.b).toBe(0);
-    expect(result.a).toBe(1);
-  });
-
-  it("converts white #ffffff", () => {
-    const result = hexToRgb("#ffffff");
-    expect(result.r).toBeCloseTo(1);
-    expect(result.g).toBeCloseTo(1);
-    expect(result.b).toBeCloseTo(1);
-    expect(result.a).toBe(1);
-  });
-
-  it("converts 8-char hex with alpha", () => {
-    // #ff000080 → alpha = 0x80 / 255 ≈ 0.502
-    const result = hexToRgb("#ff000080");
-    expect(result.r).toBeCloseTo(1);
-    expect(result.a).toBeCloseTo(128 / 255);
-  });
-
-  it("works without leading #", () => {
-    const result = hexToRgb("00ff00");
-    expect(result.g).toBeCloseTo(1);
-  });
-});
-
 // ── makeSolidPaint ────────────────────────────────────────────────────────────
 
 describe("makeSolidPaint", () => {
@@ -69,6 +31,16 @@ describe("makeSolidPaint", () => {
     expect(paint.type).toBe("SOLID");
     expect((paint.color as any).r).toBeCloseTo(1);
     expect((paint as any).opacity).toBeUndefined();
+  });
+
+  it("accepts every color notation, not just hex", () => {
+    const oklch = makeSolidPaint("oklch(0.628 0.2577 29.23)");
+    expect((oklch.color as any).r).toBeCloseTo(1, 2);
+    expect((oklch.color as any).g).toBeCloseTo(0, 2);
+    const hsl = makeSolidPaint("hsl(120 100% 25%)");
+    expect((hsl.color as any).g).toBeCloseTo(0.5, 2);
+    const rgb = makeSolidPaint("rgb(59 130 246 / 50%)");
+    expect((rgb as any).opacity).toBeCloseTo(0.5);
   });
 
   it("omits opacity when alpha is 1", () => {
@@ -108,43 +80,46 @@ describe("makeSolidPaint", () => {
 // ── applyAutoLayout ───────────────────────────────────────────────────────────
 
 describe("applyAutoLayout", () => {
-  const makeFrame = () => ({
-    layoutMode: "NONE" as string,
+  const makeFrame = (): AutoLayoutProps => ({
+    layoutMode: "NONE",
     paddingTop: 0,
     paddingRight: 0,
     paddingBottom: 0,
     paddingLeft: 0,
     itemSpacing: 0,
-    primaryAxisAlignItems: undefined as any,
-    counterAxisAlignItems: undefined as any,
-    primaryAxisSizingMode: undefined as any,
-    counterAxisSizingMode: undefined as any,
-    layoutWrap: undefined as any,
-    counterAxisSpacing: undefined as any,
+    primaryAxisAlignItems: "MIN",
+    counterAxisAlignItems: "MIN",
+    primaryAxisSizingMode: "FIXED",
+    counterAxisSizingMode: "FIXED",
+    layoutWrap: "NO_WRAP",
+    counterAxisSpacing: null,
+    counterAxisAlignContent: "AUTO",
+    itemReverseZIndex: false,
+    strokesIncludedInLayout: false,
   });
 
   it("sets layoutMode", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, { layoutMode: "HORIZONTAL" });
+    applyAutoLayout(frame, { layoutMode: "HORIZONTAL" });
     expect(frame.layoutMode).toBe("HORIZONTAL");
   });
 
   it("sets padding values", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, { paddingTop: 8, paddingRight: 16, paddingBottom: 8, paddingLeft: 16 });
+    applyAutoLayout(frame, { paddingTop: 8, paddingRight: 16, paddingBottom: 8, paddingLeft: 16 });
     expect(frame.paddingTop).toBe(8);
     expect(frame.paddingRight).toBe(16);
   });
 
   it("sets itemSpacing", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, { itemSpacing: 12 });
+    applyAutoLayout(frame, { itemSpacing: 12 });
     expect(frame.itemSpacing).toBe(12);
   });
 
   it("sets axis alignment when layoutMode is not NONE", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, {
+    applyAutoLayout(frame, {
       layoutMode: "HORIZONTAL",
       primaryAxisAlignItems: "CENTER",
       counterAxisAlignItems: "MIN",
@@ -161,15 +136,15 @@ describe("applyAutoLayout", () => {
 
   it("does not set axis props when layoutMode is NONE", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, {
+    applyAutoLayout(frame, {
       primaryAxisAlignItems: "CENTER",
     });
-    expect(frame.primaryAxisAlignItems).toBeUndefined();
+    expect(frame.primaryAxisAlignItems).toBe("MIN");
   });
 
   it("sets counterAxisSpacing only when layoutWrap is WRAP", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, {
+    applyAutoLayout(frame, {
       layoutMode: "HORIZONTAL",
       layoutWrap: "WRAP",
       counterAxisSpacing: 8,
@@ -179,12 +154,83 @@ describe("applyAutoLayout", () => {
 
   it("skips counterAxisSpacing when not WRAP", () => {
     const frame = makeFrame();
-    applyAutoLayout(frame as any, {
+    applyAutoLayout(frame, {
       layoutMode: "HORIZONTAL",
       layoutWrap: "NO_WRAP",
       counterAxisSpacing: 8,
     });
-    expect(frame.counterAxisSpacing).toBeUndefined();
+    expect(frame.counterAxisSpacing).toBeNull();
+  });
+
+  it("sets counterAxisAlignContent only when layoutWrap is WRAP", () => {
+    const wrapped = makeFrame();
+    applyAutoLayout(wrapped, {
+      layoutMode: "HORIZONTAL",
+      layoutWrap: "WRAP",
+      counterAxisAlignContent: "SPACE_BETWEEN",
+    });
+    expect(wrapped.counterAxisAlignContent).toBe("SPACE_BETWEEN");
+
+    const unwrapped = makeFrame();
+    applyAutoLayout(unwrapped, {
+      layoutMode: "HORIZONTAL",
+      layoutWrap: "NO_WRAP",
+      counterAxisAlignContent: "SPACE_BETWEEN",
+    });
+    expect(unwrapped.counterAxisAlignContent).toBe("AUTO");
+  });
+
+  it("sets itemReverseZIndex and strokesIncludedInLayout, including false", () => {
+    const frame = makeFrame();
+    frame.itemReverseZIndex = true;
+    applyAutoLayout(frame, {
+      layoutMode: "VERTICAL",
+      itemReverseZIndex: false,
+      strokesIncludedInLayout: true,
+    });
+    expect(frame.itemReverseZIndex).toBe(false);
+    expect(frame.strokesIncludedInLayout).toBe(true);
+  });
+});
+
+// ── applyLayoutSizing ─────────────────────────────────────────────────────────
+
+describe("applyLayoutSizing", () => {
+  const makeChild = (): LayoutSizingProps => ({
+    layoutPositioning: "AUTO",
+    layoutSizingHorizontal: "FIXED",
+    layoutSizingVertical: "FIXED",
+  });
+
+  it("sets sizing and positioning", () => {
+    const child = makeChild();
+    applyLayoutSizing(child, {
+      layoutPositioning: "ABSOLUTE",
+      layoutSizingHorizontal: "FILL",
+      layoutSizingVertical: "HUG",
+    });
+    expect(child.layoutPositioning).toBe("ABSOLUTE");
+    expect(child.layoutSizingHorizontal).toBe("FILL");
+    expect(child.layoutSizingVertical).toBe("HUG");
+  });
+
+  it("leaves absent params untouched", () => {
+    const child = makeChild();
+    applyLayoutSizing(child, { layoutSizingHorizontal: "FILL" });
+    expect(child.layoutSizingVertical).toBe("FIXED");
+    expect(child.layoutPositioning).toBe("AUTO");
+  });
+
+  it("applies positioning before sizing", () => {
+    const order: string[] = [];
+    const tracked = new Proxy(makeChild(), {
+      set(target, key, value) {
+        order.push(String(key));
+        return Reflect.set(target, key, value);
+      },
+    });
+    applyLayoutSizing(tracked, { layoutPositioning: "ABSOLUTE", layoutSizingHorizontal: "FILL" });
+    expect(order).toEqual(["layoutPositioning", "layoutSizingHorizontal"]);
   });
 });
 

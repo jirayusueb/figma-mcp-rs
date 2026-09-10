@@ -1,3 +1,5 @@
+import { formatColor } from "./color";
+
 // Serializers — shared read/write helpers for converting Figma node data to JSON.
 
 export const isMixed = (value: any) => typeof value === "symbol";
@@ -6,11 +8,8 @@ export const isMixed = (value: any) => typeof value === "symbol";
 // Figma sometimes returns values like 123.99999999999999 instead of 124.
 const pixelRound = (v: number) => Math.round(v * 100) / 100;
 
-export const toHex = (color: any) => {
-  const clamp = (v: any) => Math.min(255, Math.max(0, Math.round(v * 255)));
-  const [r, g, b] = [clamp(color.r), clamp(color.g), clamp(color.b)];
-  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-};
+export const toHex = (color: any) =>
+  formatColor({ r: color.r, g: color.g, b: color.b, a: 1 }, "hex");
 
 export const serializePaints = (paints: any) => {
   if (isMixed(paints)) return "mixed";
@@ -82,6 +81,59 @@ export const serializeStyles = async (node: any) => {
       left: node.paddingLeft,
     };
   }
+
+  if ("layoutMode" in node && node.layoutMode !== "NONE") {
+    const layout: Record<string, unknown> = {
+      mode: node.layoutMode,
+      itemSpacing: node.itemSpacing,
+      primaryAxisAlignItems: node.primaryAxisAlignItems,
+      counterAxisAlignItems: node.counterAxisAlignItems,
+      primaryAxisSizingMode: node.primaryAxisSizingMode,
+      counterAxisSizingMode: node.counterAxisSizingMode,
+    };
+    if (node.layoutWrap === "WRAP") {
+      layout.layoutWrap = "WRAP";
+      layout.counterAxisSpacing = node.counterAxisSpacing;
+      layout.counterAxisAlignContent = node.counterAxisAlignContent;
+    }
+    if (node.itemReverseZIndex) layout.itemReverseZIndex = true;
+    if (node.strokesIncludedInLayout) layout.strokesIncludedInLayout = true;
+    styles.layout = layout;
+  }
+
+  // Child-level sizing is only meaningful (and only readable) inside an auto-layout parent.
+  const layoutParent = node.parent;
+  if (layoutParent && layoutParent.layoutMode && layoutParent.layoutMode !== "NONE") {
+    const horizontal = node.layoutSizingHorizontal;
+    const vertical = node.layoutSizingVertical;
+    if (horizontal !== "FIXED" || vertical !== "FIXED") {
+      styles.layoutSizing = { horizontal, vertical };
+    }
+    if (node.layoutPositioning === "ABSOLUTE") styles.layoutPositioning = "ABSOLUTE";
+  }
+
+  // Style links. fillStyle/strokeStyle names are resolved above; textStyle comes
+  // from serializeText (only TEXT nodes carry one). Raw ids ride along under
+  // styleIds so a read result can be fed straight back into apply_style_to_node.
+  const shortKeys: Record<string, string> = {
+    fillStyleId: "fill",
+    strokeStyleId: "stroke",
+    textStyleId: "text",
+    effectStyleId: "effect",
+    gridStyleId: "grid",
+  };
+  const nameKeys: Record<string, string> = { effect: "effectStyle", grid: "gridStyle" };
+  const styleIds: Record<string, string> = {};
+  for (const idKey of Object.keys(shortKeys)) {
+    const id = node[idKey];
+    if (!id || typeof id !== "string") continue;
+    styleIds[shortKeys[idKey]] = id;
+    const nameKey = nameKeys[shortKeys[idKey]];
+    if (!nameKey) continue;
+    const style = await figma.getStyleByIdAsync(id);
+    if (style) styles[nameKey] = style.name;
+  }
+  if (Object.keys(styleIds).length > 0) styles.styleIds = styleIds;
 
   return styles;
 };
@@ -173,12 +225,16 @@ export const serializeNode = async (node: any): Promise<any> => {
     return { id: node.id, name: node.name, type: node.type, bounds: getBounds(node) };
   }
   const styles = await serializeStyles(node);
+  const boundVariables = await serializeBoundVariables(node);
+  const variableModes = await serializeVariableModes(node);
   const base = {
     id: node.id,
     name: node.name,
     type: node.type,
     bounds: getBounds(node),
     styles,
+    ...(boundVariables ? { boundVariables } : {}),
+    ...(variableModes ? { variableModes } : {}),
   };
   if (node.type === "TEXT") return serializeText(node, base);
   if ("children" in node) {
@@ -265,4 +321,73 @@ export const serializeVariableValue = (value: any) => {
   }
 
   return value;
+};
+
+// ── Variable helpers ──────────────────────────────────────────────────────────
+
+// ponytail: per-request memo, cleared in main.ts. Grows to the number of distinct
+// bound variables in one read, not the whole file.
+const variableNameCache = new Map<string, string | null>();
+
+export const clearVariableNameCache = () => variableNameCache.clear();
+
+export const variableName = async (id: string) => {
+  const cached = variableNameCache.get(id);
+  if (cached !== undefined) return cached;
+  const variable = await figma.variables.getVariableByIdAsync(id);
+  const name = variable ? variable.name : null;
+  variableNameCache.set(id, name);
+  return name;
+};
+
+const isAlias = (value: unknown): value is VariableAlias =>
+  !!value &&
+  typeof value === "object" &&
+  (value as VariableAlias).type === "VARIABLE_ALIAS" &&
+  typeof (value as VariableAlias).id === "string";
+
+export const withAliasName = async (value: unknown) =>
+  isAlias(value)
+    ? { type: "VARIABLE_ALIAS", id: value.id, name: await variableName(value.id) }
+    : value;
+
+// Works for nodes and all four style types: both use alias / alias[] shapes.
+export const serializeBoundVariables = async (target: {
+  boundVariables?: Record<string, VariableAlias | VariableAlias[]>;
+}) => {
+  const bound = target.boundVariables;
+  if (!bound) return undefined;
+  const result: Record<string, unknown> = {};
+  for (const field of Object.keys(bound)) {
+    const value = bound[field];
+    if (Array.isArray(value)) {
+      result[field] = await Promise.all(
+        value.map(async (alias) => ({ id: alias.id, name: await variableName(alias.id) })),
+      );
+    } else if (isAlias(value)) {
+      result[field] = { id: value.id, name: await variableName(value.id) };
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+};
+
+// { collectionId: modeId } -> { collectionName: modeName }, falling back to raw
+// ids when the collection or mode has since been deleted.
+export const serializeVariableModes = async (node: {
+  explicitVariableModes?: Record<string, string>;
+}) => {
+  const modes = node.explicitVariableModes;
+  if (!modes || Object.keys(modes).length === 0) return undefined;
+  const result: Record<string, string> = {};
+  for (const collectionId of Object.keys(modes)) {
+    const modeId = modes[collectionId];
+    const collection = await figma.variables.getVariableCollectionByIdAsync(collectionId);
+    if (!collection) {
+      result[collectionId] = modeId;
+      continue;
+    }
+    const mode = collection.modes.find((m) => m.modeId === modeId);
+    result[collection.name] = mode ? mode.name : modeId;
+  }
+  return result;
 };

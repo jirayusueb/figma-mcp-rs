@@ -30,7 +30,8 @@ Map discovered values to semantic token names. Use this hierarchy:
 **Colors** (variable collection "Primitives"):
 - Sort colors by hue/lightness.
 - Assign names like "Blue/100", "Blue/200", … "Blue/900", "Neutral/50", "Neutral/900", etc.
-- Also create a "Semantic" collection with aliases: "Color/Primary", "Color/Background", "Color/Text", etc.
+- Also create a "Semantic" collection whose variables alias the primitives: "Color/Primary",
+  "Color/Background", "Color/Text", etc.
 
 **Spacing** (variable collection "Spacing"):
 - Name by scale: "Spacing/0" (0), "Spacing/1" (4px), "Spacing/2" (8px), "Spacing/3" (12px), …
@@ -47,15 +48,19 @@ Present the full token plan to the user for approval before creating anything.
 
 For each approved token:
 - COLOR variables: create_variable_collection() → create_variable(type="COLOR") → set_variable_value()
+  (value takes hex, rgb(), hsl(), or oklch())
+- Semantic aliases: set_variable_value(variableId=<semantic>, modeId=<mode>, aliasVariableId=<primitive>)
 - FLOAT variables: create_variable_collection() → create_variable(type="FLOAT") → set_variable_value()
 - Text styles: create_text_style() with name, fontFamily, fontSize, lineHeight, letterSpacing
 - Paint styles: create_paint_style() with name, color
+- Scopes and Dev Mode code syntax: update_variable(variableId, scopes=[…], codeSyntaxWeb="--token-name")
 
 ### Phase 4 — Linking (optional, ask user)
 
 After creating tokens, offer to link existing nodes:
 - For nodes with raw fill colors that match a new variable → bind_variable_to_node(field="fillColor")
 - For TEXT nodes with matching font styles → apply_style_to_node(styleId)
+- For a style whose value should follow a token → bind_variable_to_style(styleId, field, variableId)
 
 ## Multi-mode / Theming (Light & Dark)
 
@@ -86,6 +91,9 @@ Bind the active-theme variable to nodes (e.g. bind the "light/color-bg" variable
 When the user wants to switch to dark, rebind nodes to the corresponding "dark/*" variable.
 Inform the user that native mode-switching requires a paid Figma plan; with this workaround
 they manually choose which prefixed variable to bind.
+
+On a paid plan, preview a mode on a subtree with
+set_variable_mode(collectionId, modeId, nodeId) — omit modeId to clear the override.
 
 ## Rules
 - Never delete or overwrite existing styles/variables — only add new ones.

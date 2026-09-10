@@ -7,7 +7,7 @@
 // MANIFEST: clone_node | CloneNodeArgs | Clone an existing node, optionally repositioning it or placing it in a new parent.
 // MANIFEST: set_opacity | SetOpacityArgs | Set the opacity of one or more nodes (0 = fully transparent, 1 = fully opaque).
 // MANIFEST: set_corner_radius | SetCornerRadiusArgs | Set corner radius on one or more nodes. Provide a uniform cornerRadius or individual per-corner values.
-// MANIFEST: set_auto_layout | SetAutoLayoutArgs | Set or update auto-layout (flex) properties on an existing frame.
+// MANIFEST: set_auto_layout | SetAutoLayoutArgs | Set auto-layout properties on one or more nodes. Container properties (layoutMode, padding, itemSpacing, alignment, wrap) apply to frames, components and instances. Sizing properties apply to the node itself: layoutSizingHorizontal/Vertical HUG needs the node to be an auto-layout frame or text, FILL needs the node to already sit inside an auto-layout parent, and layoutPositioning ABSOLUTE lifts a child out of the parent's flow. Figma only.
 // MANIFEST: delete_nodes | DeleteNodesArgs | Delete one or more nodes. This cannot be undone via MCP — use with care.
 // MANIFEST: set_visible | SetVisibleArgs | Show or hide one or more nodes by setting their visibility.
 // MANIFEST: lock_nodes | LockNodesArgs | Lock one or more nodes to prevent accidental edits in Figma.
@@ -216,8 +216,8 @@ pub(crate) async fn set_corner_radius(
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SetAutoLayoutArgs {
-    /// Frame node ID in colon format e.g. '4029:12345'
-    pub node_id: String,
+    /// Node IDs in colon format e.g. ['4029:12345']
+    pub node_ids: Vec<String>,
     /// Auto-layout direction: HORIZONTAL, VERTICAL, or NONE
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout_mode: Option<String>,
@@ -254,6 +254,24 @@ pub(crate) struct SetAutoLayoutArgs {
     /// Gap between wrapped rows/columns (only when layoutWrap is WRAP)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub counter_axis_spacing: Option<f64>,
+    /// Alignment of wrapped tracks: AUTO or SPACE_BETWEEN (only when layoutWrap is WRAP)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counter_axis_align_content: Option<String>,
+    /// Reverse child z-order so the first child renders on top
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_reverse_z_index: Option<bool>,
+    /// Include strokes in layout size calculations
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strokes_included_in_layout: Option<bool>,
+    /// Horizontal sizing: FIXED, HUG (auto-layout frames and text only), or FILL (only for a node inside an auto-layout parent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_sizing_horizontal: Option<String>,
+    /// Vertical sizing: FIXED, HUG (auto-layout frames and text only), or FILL (only for a node inside an auto-layout parent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_sizing_vertical: Option<String>,
+    /// AUTO to flow inside the parent's auto layout, ABSOLUTE to position freely inside it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_positioning: Option<String>,
 }
 
 pub(crate) async fn set_auto_layout(

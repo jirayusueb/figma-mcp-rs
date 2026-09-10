@@ -359,8 +359,9 @@ design system's named styles or variables. Report findings and optionally fix th
 2. **Scan the design**
    - Call get_design_context() with detail="compact" to get the full node tree.
    - For each node that has a fills, strokes, or textStyle property:
+     - If the node reports "boundVariables" for that property → driven by a variable, skip.
      - If the node's style field shows a named style (e.g. "fillStyle": "Brand/Primary") → already linked, skip.
-     - If the node shows a raw fill color (e.g. "fills": [{"type":"SOLID","color":...}]) without a style name → flag it.
+     - If the node shows a raw fill color (e.g. "fills": [{"type":"SOLID","color":...}]) with no style name and no boundVariables entry → flag it.
      - If a TEXT node shows raw fontFamily/fontSize without a textStyle name → flag it.
 
 3. **Match raw values to existing styles**
@@ -376,6 +377,7 @@ design system's named styles or variables. Report findings and optionally fix th
 5. **Fix (optional, ask user first)**
    For each node with a matching style, call:
      apply_style_to_node(nodeId, styleId, target)
+   The node's styles.styleIds map from step 2 already carries the id to reuse.
    Batch nodes by styleId to minimize round trips.
 
 ## Rules
@@ -464,7 +466,8 @@ Map discovered values to semantic token names. Use this hierarchy:
 **Colors** (variable collection "Primitives"):
 - Sort colors by hue/lightness.
 - Assign names like "Blue/100", "Blue/200", … "Blue/900", "Neutral/50", "Neutral/900", etc.
-- Also create a "Semantic" collection with aliases: "Color/Primary", "Color/Background", "Color/Text", etc.
+- Also create a "Semantic" collection whose variables alias the primitives: "Color/Primary",
+  "Color/Background", "Color/Text", etc.
 
 **Spacing** (variable collection "Spacing"):
 - Name by scale: "Spacing/0" (0), "Spacing/1" (4px), "Spacing/2" (8px), "Spacing/3" (12px), …
@@ -481,15 +484,19 @@ Present the full token plan to the user for approval before creating anything.
 
 For each approved token:
 - COLOR variables: create_variable_collection() → create_variable(type="COLOR") → set_variable_value()
+  (value takes hex, rgb(), hsl(), or oklch())
+- Semantic aliases: set_variable_value(variableId=<semantic>, modeId=<mode>, aliasVariableId=<primitive>)
 - FLOAT variables: create_variable_collection() → create_variable(type="FLOAT") → set_variable_value()
 - Text styles: create_text_style() with name, fontFamily, fontSize, lineHeight, letterSpacing
 - Paint styles: create_paint_style() with name, color
+- Scopes and Dev Mode code syntax: update_variable(variableId, scopes=[…], codeSyntaxWeb="--token-name")
 
 ### Phase 4 — Linking (optional, ask user)
 
 After creating tokens, offer to link existing nodes:
 - For nodes with raw fill colors that match a new variable → bind_variable_to_node(field="fillColor")
 - For TEXT nodes with matching font styles → apply_style_to_node(styleId)
+- For a style whose value should follow a token → bind_variable_to_style(styleId, field, variableId)
 
 ## Multi-mode / Theming (Light & Dark)
 
@@ -520,6 +527,9 @@ Bind the active-theme variable to nodes (e.g. bind the "light/color-bg" variable
 When the user wants to switch to dark, rebind nodes to the corresponding "dark/*" variable.
 Inform the user that native mode-switching requires a paid Figma plan; with this workaround
 they manually choose which prefixed variable to bind.
+
+On a paid plan, preview a mode on a subtree with
+set_variable_mode(collectionId, modeId, nodeId) — omit modeId to clear the override.
 
 ## Rules
 - Never delete or overwrite existing styles/variables — only add new ones.
@@ -590,18 +600,22 @@ Dark mode (add a "Dark" mode to the same collection):
 
 1. create_variable_collection(name="Primitives", modeName="Value")
 2. For each color in the scale: create_variable(type="COLOR", name="Primary/500", collectionId=...)
-   then set_variable_value(variableId, modeId, value="#hexcolor")
+   then set_variable_value(variableId, modeId, value="#hexcolor") — value also accepts
+   rgb(), hsl(), and oklch() notation, e.g. oklch(0.72 0.13 250)
 3. Repeat for secondary and neutrals.
 4. create_variable_collection(name="Semantic Colors", modeName="Light")
 5. add_variable_mode(collectionId, modeName="Dark") — if dark mode requested
-6. For each semantic alias: create_variable + set_variable_value for Light mode, then Dark mode.
+6. For each semantic alias: create_variable, then
+   set_variable_value(variableId=<semantic>, modeId=<Light mode>, aliasVariableId=<primitive>)
+   so the semantic token points at the primitive instead of copying its value. Repeat per mode.
 
 ## Rules
 - Always show the color table preview before executing creation.
 - Create Primitives collection first, Semantic collection second.
-- Use only hex values for variable colors.
-- Semantic variable values reference other variables conceptually — set the actual resolved hex value
-  since variable aliasing (variable-to-variable binding) is not yet supported via MCP.
+- Any of hex, rgb(), hsl(), or oklch() is accepted for variable colors — pass the notation the
+  palette was designed in; the plugin converts it.
+- Semantic variables must alias their primitive via aliasVariableId, not duplicate its resolved
+  value, so a primitive edit propagates.
 "##;
 
 const PROMPT_GENERATE_TYPE_SCALE: &str = r##"# Generate Type Scale
