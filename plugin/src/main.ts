@@ -56,7 +56,7 @@ figma.ui.onmessage = async (message) => {
     figma.ui.postMessage({
       type: "ws_config",
       host: config?.host ?? "127.0.0.1",
-      port: config?.port ?? "1994",
+      port: config?.port ?? "1998",
     });
     return;
   }

@@ -52,7 +52,7 @@ claude mcp add -s project figma-mcp-rs -- /path/to/figma-mcp-rs/target/release/f
 codex mcp add figma-mcp-rs -- npx -y figma-mcp-rs@latest
 ```
 
-**Claude Code plugin marketplace** (also installs the 13 skills)
+**Claude Code plugin marketplace** (also installs the 15 skills)
 ```
 /plugin marketplace add <this-repo>
 /plugin install figma-mcp-rs@figma-mcp-rs
@@ -83,13 +83,13 @@ codex mcp add figma-mcp-rs -- npx -y figma-mcp-rs@latest
 }
 ```
 
-Server flags: `--ip` (default `127.0.0.1`), `--port` (default `1994`).
+Server flags: `--ip` (default `127.0.0.1`), `--port` (default `1998`).
 
 ### 2. Install the Figma plugin
 
 1. In Figma Desktop: **Plugins → Development → Import plugin from manifest**
 2. Select `manifest.json` from the release `plugin.zip` (or `plugin/manifest.json` after `make build-ts`)
-3. Run the plugin inside any **Figma or FigJam** file — it connects to the server over `ws://127.0.0.1:1994` (host/port configurable in the plugin UI)
+3. Run the plugin inside any **Figma or FigJam** file — it connects to the server over `ws://127.0.0.1:1998` (host/port configurable in the plugin UI)
 
 Multiple server instances are safe: the first to bind the port becomes leader and owns the plugin connection; others become followers that proxy tool calls and take over automatically if the leader dies.
 
@@ -237,9 +237,9 @@ The plugin loads in every editor (`editorType: ["figma", "figjam", "slides", "de
 
 `read_design_strategy`, `design_strategy`, `text_replacement_strategy`, `annotation_conversion_strategy`, `swap_overrides_instances`, `reaction_to_connector_strategy`, `style_audit_strategy`, `bulk_rename_strategy`, `design_token_generation_strategy`, `generate_color_palette`, `generate_type_scale`, `generate_component_variants`
 
-### Claude Skills (13)
+### Claude Skills (15)
 
-`skills/` ships the 12 prompts as Claude Code skills plus `bridge-troubleshooting` (connection, timeout, port, and FigJam-limit diagnostics). Installed automatically via the plugin marketplace; otherwise copy `skills/` into your project's `.claude/skills/`.
+`skills/` ships the 12 prompts as Claude Code skills plus `bridge-troubleshooting` (connection diagnostics), `figjam-boards` (FigJam stickies, shapes, tables, connectors, auto-arrange), and `editor-compatibility` (Figma/FigJam/Slides tool matrix). Installed automatically via the plugin marketplace; otherwise copy `skills/` into your project's `.claude/skills/`.
 
 ## Development
 

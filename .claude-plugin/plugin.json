@@ -1,7 +1,7 @@
 {
   "name": "figma-mcp-rs",
-  "description": "Figma + FigJam MCP server with full read/write access via plugin bridge. No API token, no rate limits, 75 tools, 13 skills.",
-  "version": "0.1.3",
+  "description": "Figma + FigJam MCP server with full read/write access via plugin bridge. No API token, no rate limits, 75 tools, 15 skills.",
+  "version": "0.0.1",
   "license": "MIT",
   "mcpServers": {
     "figma-mcp-rs": {

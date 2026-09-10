@@ -1,7 +1,8 @@
 // FigJam-specific tools: stickies, shapes, tables, code blocks, auto-arrange, board reads.
 
 import { isFigjam } from "./figjam";
-import { makeSolidPaint, getBounds } from "./write-helpers";
+import { makeSolidPaint } from "./write-helpers";
+import { getBounds } from "./serializers";
 
 export const handleFigjamToolRequest = async (request: unknown) => {
   const req = request as any;

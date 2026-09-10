@@ -39,6 +39,146 @@ var __async = (__this, __arguments, generator) => {
 };
 (function() {
   "use strict";
+  const handleExecuteRequest = (request2) => __async(null, null, function* () {
+    if (request2.type !== "execute_code") return null;
+    const p = request2.params || {};
+    if (typeof p.code !== "string" || !p.code.trim()) {
+      throw new Error("code is required");
+    }
+    const timeoutMs = Math.min(Math.max(Number(p.timeoutMs) || 5e3, 1), 25e3);
+    const logs = [];
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    const captureLog = (level, ...args) => {
+      const msg = args.map((a) => String(a)).join(" ");
+      logs.push(`${level}: ${msg}`);
+      if (logs.length > 200) {
+        logs.shift();
+      }
+    };
+    console.log = (...args) => captureLog("log", ...args);
+    console.warn = (...args) => captureLog("warn", ...args);
+    console.error = (...args) => captureLog("error", ...args);
+    try {
+      const wrapped = `(async function() {
+${p.code}
+})()`;
+      const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject(new Error(`Execution timed out after ${timeoutMs}ms`)), timeoutMs)
+      );
+      const value = yield Promise.race([
+        (0, eval)(wrapped),
+        timeoutPromise
+      ]);
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: {
+          result: serializeResult(value),
+          logs
+        }
+      };
+    } finally {
+      console.log = originalLog;
+      console.warn = originalWarn;
+      console.error = originalError;
+    }
+  });
+  function serializeResult(value) {
+    if (value === void 0 || value === null) {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      const arr = value.slice(0, 500).map(serializeResult);
+      if (value.length > 500) {
+        arr.push({ truncated: value.length - 500 });
+      }
+      return arr;
+    }
+    if (value && typeof value === "object" && typeof value.id === "string" && typeof value.type === "string" && typeof value.name === "string") {
+      return {
+        id: value.id,
+        name: value.name,
+        type: value.type
+      };
+    }
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (e) {
+      return String(value);
+    }
+  }
+  function isFigjam() {
+    return figma.editorType === "figjam";
+  }
+  function assertNotFigjam(feature) {
+    if (isFigjam()) throw new Error(`${feature} is not available in FigJam`);
+  }
+  const hexToRgb = (hex) => {
+    const clean = hex.replace("#", "");
+    return {
+      r: parseInt(clean.slice(0, 2), 16) / 255,
+      g: parseInt(clean.slice(2, 4), 16) / 255,
+      b: parseInt(clean.slice(4, 6), 16) / 255,
+      a: clean.length >= 8 ? parseInt(clean.slice(6, 8), 16) / 255 : 1
+    };
+  };
+  const makeSolidPaint = (colorInput, opacityOverride) => {
+    const { r, g, b, a } = typeof colorInput === "string" ? hexToRgb(colorInput) : { r: colorInput.r, g: colorInput.g, b: colorInput.b, a: colorInput.a != null ? colorInput.a : 1 };
+    const eff = opacityOverride != null ? opacityOverride : a;
+    const paint = { type: "SOLID", color: { r, g, b } };
+    if (eff !== 1) paint.opacity = eff;
+    return paint;
+  };
+  const getParentNode = (parentId) => __async(null, null, function* () {
+    if (!parentId) return figma.currentPage;
+    const parent = yield figma.getNodeByIdAsync(parentId);
+    if (!parent) throw new Error(`Parent node not found: ${parentId}`);
+    if (!("appendChild" in parent)) throw new Error(`Node ${parentId} cannot have children`);
+    return parent;
+  });
+  const applyAutoLayout = (frame, p) => {
+    if (p.layoutMode != null) frame.layoutMode = p.layoutMode;
+    if (p.paddingTop != null) frame.paddingTop = Number(p.paddingTop);
+    if (p.paddingRight != null) frame.paddingRight = Number(p.paddingRight);
+    if (p.paddingBottom != null) frame.paddingBottom = Number(p.paddingBottom);
+    if (p.paddingLeft != null) frame.paddingLeft = Number(p.paddingLeft);
+    if (p.itemSpacing != null) frame.itemSpacing = Number(p.itemSpacing);
+    if (frame.layoutMode !== "NONE") {
+      if (p.primaryAxisAlignItems) frame.primaryAxisAlignItems = p.primaryAxisAlignItems;
+      if (p.counterAxisAlignItems) frame.counterAxisAlignItems = p.counterAxisAlignItems;
+      if (p.primaryAxisSizingMode) frame.primaryAxisSizingMode = p.primaryAxisSizingMode;
+      if (p.counterAxisSizingMode) frame.counterAxisSizingMode = p.counterAxisSizingMode;
+      if (p.layoutWrap) frame.layoutWrap = p.layoutWrap;
+      if (p.counterAxisSpacing != null && frame.layoutWrap === "WRAP") {
+        frame.counterAxisSpacing = Number(p.counterAxisSpacing);
+      }
+    }
+  };
+  const base64ToBytes = (b64) => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const lookup = {};
+    for (let i = 0; i < chars.length; i++) lookup[chars[i]] = i;
+    const padded = b64.replace(/[^A-Za-z0-9+/=]/g, "");
+    const clean = padded.replace(/=/g, "");
+    let outLen = Math.floor(padded.length * 3 / 4);
+    if (padded.endsWith("==")) outLen -= 2;
+    else if (padded.endsWith("=")) outLen -= 1;
+    const bytes = new Uint8Array(outLen);
+    let j = 0;
+    for (let i = 0; i < clean.length; i += 4) {
+      const a = lookup[clean[i]] || 0;
+      const bv = lookup[clean[i + 1]] || 0;
+      const c = lookup[clean[i + 2]] || 0;
+      const d = lookup[clean[i + 3]] || 0;
+      bytes[j++] = a << 2 | bv >> 4;
+      if (j < outLen) bytes[j++] = (bv & 15) << 4 | c >> 2;
+      if (j < outLen) bytes[j++] = (c & 3) << 6 | d;
+    }
+    return bytes;
+  };
   const isMixed = (value) => typeof value === "symbol";
   const pixelRound = (v) => Math.round(v * 100) / 100;
   const toHex = (color) => {
@@ -241,6 +381,290 @@ var __async = (__this, __arguments, generator) => {
     }
     return value;
   };
+  const handleFigjamToolRequest = (request2) => __async(null, null, function* () {
+    const req = request2;
+    if (!req || typeof req !== "object") return null;
+    switch (req.type) {
+      case "create_stickies":
+        return handleCreateStickies(req);
+      case "create_shape_with_text":
+        return handleCreateShapeWithText(req);
+      case "create_table":
+        return handleCreateTable(req);
+      case "create_code_block":
+        return handleCreateCodeBlock(req);
+      case "auto_arrange":
+        return handleAutoArrange(req);
+      case "get_board_contents":
+        return handleGetBoardContents(req);
+      default:
+        return null;
+    }
+  });
+  function handleCreateStickies(request2) {
+    return __async(this, null, function* () {
+      var _a, _b, _c, _d;
+      if (!isFigjam()) throw new Error("create_stickies is only available in FigJam");
+      const p = request2.params || {};
+      const items = Array.isArray(p.items) ? p.items : [];
+      if (!items.length) throw new Error("items must be a non-empty array");
+      if (items.length > 200) throw new Error("items supports at most 200 stickies per call");
+      const startX = (_a = p.startX) != null ? _a : 0;
+      const startY = (_b = p.startY) != null ? _b : 0;
+      const columns = (_c = p.columns) != null ? _c : 5;
+      const spacing = (_d = p.spacing) != null ? _d : 40;
+      const nodes = [];
+      items.filter((it) => it.x == null || it.y == null);
+      let row = 0, col = 0;
+      for (const item of items) {
+        const sticky = figma.createSticky();
+        const fontName = typeof sticky.text.fontName === "symbol" ? { family: "Inter", style: "Regular" } : sticky.text.fontName;
+        yield figma.loadFontAsync(fontName);
+        sticky.text.characters = item.text || "";
+        if (item.fillColor) sticky.fills = [makeSolidPaint(item.fillColor)];
+        if (item.name) sticky.name = item.name;
+        if (item.x != null && item.y != null) {
+          sticky.x = item.x;
+          sticky.y = item.y;
+        } else {
+          sticky.x = startX + col * (sticky.width + spacing);
+          sticky.y = startY + row * (sticky.height + spacing);
+          col++;
+          if (col >= columns) {
+            col = 0;
+            row++;
+          }
+        }
+        nodes.push({ id: sticky.id, name: sticky.name, type: sticky.type, bounds: getBounds(sticky) });
+      }
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: { created: nodes.length, nodes }
+      };
+    });
+  }
+  function handleCreateShapeWithText(request2) {
+    return __async(this, null, function* () {
+      if (!isFigjam()) throw new Error("create_shape_with_text is only available in FigJam");
+      const p = request2.params || {};
+      if (!p.text) throw new Error("text is required");
+      const shapeTypes = [
+        "SQUARE",
+        "ELLIPSE",
+        "ROUNDED_RECTANGLE",
+        "DIAMOND",
+        "TRIANGLE_UP",
+        "TRIANGLE_DOWN",
+        "PARALLELOGRAM_RIGHT",
+        "PARALLELOGRAM_LEFT",
+        "HEXAGON",
+        "PENTAGON",
+        "OCTAGON",
+        "STAR",
+        "PLUS",
+        "ARROW_LEFT",
+        "ARROW_RIGHT",
+        "ENG_DATABASE",
+        "ENG_QUEUE",
+        "ENG_FILE",
+        "ENG_FOLDER",
+        "TRAPEZOID",
+        "PREDEFINED_PROCESS",
+        "SHIELD",
+        "DOCUMENT_SINGLE",
+        "DOCUMENT_MULTIPLE",
+        "MANUAL_INPUT",
+        "SUMMING_JUNCTION",
+        "OR",
+        "SPEECH_BUBBLE",
+        "INTERNAL_STORAGE",
+        "CHEVRON"
+      ];
+      const shapeType = (p.shapeType || "ROUNDED_RECTANGLE").toUpperCase();
+      if (!shapeTypes.includes(shapeType)) throw new Error(`shapeType must be one of: ${shapeTypes.join(", ")}`);
+      const shape = figma.createShapeWithText();
+      const fontName = typeof shape.text.fontName === "symbol" ? { family: "Inter", style: "Regular" } : shape.text.fontName;
+      yield figma.loadFontAsync(fontName);
+      shape.text.characters = p.text;
+      if (p.fillColor) shape.fills = [makeSolidPaint(p.fillColor)];
+      if (p.x != null) shape.x = p.x;
+      if (p.y != null) shape.y = p.y;
+      if (p.width != null && p.height != null) shape.resize(p.width, p.height);
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: { id: shape.id, name: shape.name, type: shape.type, shapeType, bounds: getBounds(shape) }
+      };
+    });
+  }
+  function handleCreateTable(request2) {
+    return __async(this, null, function* () {
+      if (!isFigjam()) throw new Error("create_table is only available in FigJam");
+      const p = request2.params || {};
+      const rows = Math.floor(Number(p.rows) || 1);
+      const cols = Math.floor(Number(p.columns) || 1);
+      if (rows < 1 || rows > 50) throw new Error("rows must be between 1 and 50");
+      if (cols < 1 || cols > 50) throw new Error("columns must be between 1 and 50");
+      const table = figma.createTable(rows, cols);
+      const cells = Array.isArray(p.cells) ? p.cells : [];
+      for (let r = 0; r < cells.length && r < rows; r++) {
+        const row_cells = Array.isArray(cells[r]) ? cells[r] : [];
+        for (let c = 0; c < row_cells.length && c < cols; c++) {
+          const cell = table.cellAt(r, c);
+          if (typeof row_cells[c] === "string") {
+            const fontName = typeof cell.text.fontName === "symbol" ? { family: "Inter", style: "Regular" } : cell.text.fontName;
+            yield figma.loadFontAsync(fontName);
+            cell.text.characters = row_cells[c];
+          }
+        }
+      }
+      if (p.x != null) table.x = p.x;
+      if (p.y != null) table.y = p.y;
+      if (p.name) table.name = p.name;
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: { id: table.id, name: table.name, type: table.type, rows, columns: cols, bounds: getBounds(table) }
+      };
+    });
+  }
+  function handleCreateCodeBlock(request2) {
+    return __async(this, null, function* () {
+      if (!isFigjam()) throw new Error("create_code_block is only available in FigJam");
+      const p = request2.params || {};
+      if (!p.code) throw new Error("code is required");
+      const languages = [
+        "TYPESCRIPT",
+        "JAVASCRIPT",
+        "HTML",
+        "CSS",
+        "JSON",
+        "GRAPHQL",
+        "PYTHON",
+        "GO",
+        "SQL",
+        "SWIFT",
+        "KOTLIN",
+        "RUST",
+        "BASH",
+        "RUBY",
+        "CPP",
+        "PLAINTEXT"
+      ];
+      const language = (p.language || "PLAINTEXT").toUpperCase();
+      if (!languages.includes(language)) throw new Error(`language must be one of: ${languages.join(", ")}`);
+      const codeBlock = figma.createCodeBlock();
+      codeBlock.code = p.code;
+      codeBlock.codeLanguage = language;
+      if (p.x != null) codeBlock.x = p.x;
+      if (p.y != null) codeBlock.y = p.y;
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: { id: codeBlock.id, name: codeBlock.name, type: codeBlock.type, codeLanguage: language, bounds: getBounds(codeBlock) }
+      };
+    });
+  }
+  function handleAutoArrange(request2) {
+    return __async(this, null, function* () {
+      var _a, _b, _c;
+      if (!isFigjam()) throw new Error("auto_arrange is only available in FigJam");
+      const p = request2.params || {};
+      const layout = (p.layout || "grid").toLowerCase();
+      if (!["grid", "row", "column"].includes(layout)) throw new Error("layout must be one of: grid, row, column");
+      let targets = [];
+      if (Array.isArray(p.nodeIds) && p.nodeIds.length) {
+        for (const id of p.nodeIds) {
+          const node = yield figma.getNodeByIdAsync(id);
+          if (node) targets.push(node);
+        }
+        if (!targets.length) throw new Error("no nodes to arrange");
+      } else {
+        targets = figma.currentPage.children.slice();
+      }
+      const spacing = Number(p.spacing) || 40;
+      const cols = layout === "grid" ? Math.ceil(Math.sqrt(targets.length)) : void 0;
+      let x = (_a = p.startX) != null ? _a : 0, y = (_b = p.startY) != null ? _b : 0;
+      for (const node of targets) {
+        node.x = x;
+        node.y = y;
+        const w = node.width || 100;
+        const h = node.height || 100;
+        if (layout === "row") {
+          x += w + spacing;
+        } else if (layout === "column") {
+          y += h + spacing;
+        } else {
+          x += w + spacing;
+          if (cols && targets.indexOf(node) % cols === cols - 1) {
+            x = (_c = p.startX) != null ? _c : 0;
+            y += h + spacing;
+          }
+        }
+      }
+      const minX = Math.min(...targets.map((n) => n.x));
+      const minY = Math.min(...targets.map((n) => n.y));
+      const maxX = Math.max(...targets.map((n) => n.x + (n.width || 100)));
+      const maxY = Math.max(...targets.map((n) => n.y + (n.height || 100)));
+      figma.commitUndo();
+      return {
+        type: request2.type,
+        requestId: request2.requestId,
+        data: { arranged: targets.length, skipped: [], bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY } }
+      };
+    });
+  }
+  function handleGetBoardContents(request2) {
+    if (!isFigjam()) throw new Error("get_board_contents is only available in FigJam");
+    const p = request2.params || {};
+    const includeConnections = p.includeConnections !== false;
+    const nodes = [];
+    const connections = [];
+    const walk = (children) => {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      for (const node of children) {
+        const base = { id: node.id, name: node.name, type: node.type, bounds: getBounds(node) };
+        if (node.type === "STICKY") {
+          nodes.push(__spreadProps(__spreadValues({}, base), { text: (_b = (_a = node.text) == null ? void 0 : _a.characters) != null ? _b : "" }));
+        } else if (node.type === "SHAPE_WITH_TEXT") {
+          nodes.push(__spreadProps(__spreadValues({}, base), { text: (_d = (_c = node.text) == null ? void 0 : _c.characters) != null ? _d : "", shapeType: node.shapeType }));
+        } else if (node.type === "TEXT") {
+          nodes.push(__spreadProps(__spreadValues({}, base), { text: (_e = node.characters) != null ? _e : "" }));
+        } else if (node.type === "CODE_BLOCK") {
+          nodes.push(__spreadProps(__spreadValues({}, base), { codeLanguage: node.codeLanguage, code: node.code }));
+        } else if (node.type === "TABLE") {
+          nodes.push(__spreadProps(__spreadValues({}, base), { rows: node.rowCount, columns: node.columnCount }));
+        } else if (node.type === "CONNECTOR") {
+          if (includeConnections) {
+            const start = (_f = node.connectorStart) == null ? void 0 : _f.endpointNodeId;
+            const end = (_g = node.connectorEnd) == null ? void 0 : _g.endpointNodeId;
+            connections.push({
+              id: node.id,
+              from: start != null ? start : null,
+              to: end != null ? end : null,
+              text: (_i = (_h = node.text) == null ? void 0 : _h.characters) != null ? _i : ""
+            });
+          }
+        } else {
+          nodes.push(base);
+        }
+        if ("children" in node) {
+          walk(node.children);
+        }
+      }
+    };
+    walk(figma.currentPage.children);
+    return {
+      type: request2.type,
+      requestId: request2.requestId,
+      data: { nodes, connections, total: nodes.length + connections.length }
+    };
+  }
   const handleReadDocumentRequest = (request2) => __async(null, null, function* () {
     switch (request2.type) {
       case "get_document": {
@@ -968,75 +1392,6 @@ var __async = (__this, __arguments, generator) => {
     var _a, _b;
     return (_b = (_a = yield handleReadDocumentRequest(request2)) != null ? _a : yield handleReadStyleRequest(request2)) != null ? _b : yield handleReadExportRequest(request2);
   });
-  const hexToRgb = (hex) => {
-    const clean = hex.replace("#", "");
-    return {
-      r: parseInt(clean.slice(0, 2), 16) / 255,
-      g: parseInt(clean.slice(2, 4), 16) / 255,
-      b: parseInt(clean.slice(4, 6), 16) / 255,
-      a: clean.length >= 8 ? parseInt(clean.slice(6, 8), 16) / 255 : 1
-    };
-  };
-  const makeSolidPaint = (colorInput, opacityOverride) => {
-    const { r, g, b, a } = typeof colorInput === "string" ? hexToRgb(colorInput) : { r: colorInput.r, g: colorInput.g, b: colorInput.b, a: colorInput.a != null ? colorInput.a : 1 };
-    const eff = opacityOverride != null ? opacityOverride : a;
-    const paint = { type: "SOLID", color: { r, g, b } };
-    if (eff !== 1) paint.opacity = eff;
-    return paint;
-  };
-  const getParentNode = (parentId) => __async(null, null, function* () {
-    if (!parentId) return figma.currentPage;
-    const parent = yield figma.getNodeByIdAsync(parentId);
-    if (!parent) throw new Error(`Parent node not found: ${parentId}`);
-    if (!("appendChild" in parent)) throw new Error(`Node ${parentId} cannot have children`);
-    return parent;
-  });
-  const applyAutoLayout = (frame, p) => {
-    if (p.layoutMode != null) frame.layoutMode = p.layoutMode;
-    if (p.paddingTop != null) frame.paddingTop = Number(p.paddingTop);
-    if (p.paddingRight != null) frame.paddingRight = Number(p.paddingRight);
-    if (p.paddingBottom != null) frame.paddingBottom = Number(p.paddingBottom);
-    if (p.paddingLeft != null) frame.paddingLeft = Number(p.paddingLeft);
-    if (p.itemSpacing != null) frame.itemSpacing = Number(p.itemSpacing);
-    if (frame.layoutMode !== "NONE") {
-      if (p.primaryAxisAlignItems) frame.primaryAxisAlignItems = p.primaryAxisAlignItems;
-      if (p.counterAxisAlignItems) frame.counterAxisAlignItems = p.counterAxisAlignItems;
-      if (p.primaryAxisSizingMode) frame.primaryAxisSizingMode = p.primaryAxisSizingMode;
-      if (p.counterAxisSizingMode) frame.counterAxisSizingMode = p.counterAxisSizingMode;
-      if (p.layoutWrap) frame.layoutWrap = p.layoutWrap;
-      if (p.counterAxisSpacing != null && frame.layoutWrap === "WRAP") {
-        frame.counterAxisSpacing = Number(p.counterAxisSpacing);
-      }
-    }
-  };
-  const base64ToBytes = (b64) => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const lookup = {};
-    for (let i = 0; i < chars.length; i++) lookup[chars[i]] = i;
-    const padded = b64.replace(/[^A-Za-z0-9+/=]/g, "");
-    const clean = padded.replace(/=/g, "");
-    let outLen = Math.floor(padded.length * 3 / 4);
-    if (padded.endsWith("==")) outLen -= 2;
-    else if (padded.endsWith("=")) outLen -= 1;
-    const bytes = new Uint8Array(outLen);
-    let j = 0;
-    for (let i = 0; i < clean.length; i += 4) {
-      const a = lookup[clean[i]] || 0;
-      const bv = lookup[clean[i + 1]] || 0;
-      const c = lookup[clean[i + 2]] || 0;
-      const d = lookup[clean[i + 3]] || 0;
-      bytes[j++] = a << 2 | bv >> 4;
-      if (j < outLen) bytes[j++] = (bv & 15) << 4 | c >> 2;
-      if (j < outLen) bytes[j++] = (c & 3) << 6 | d;
-    }
-    return bytes;
-  };
-  function isFigjam() {
-    return figma.editorType === "figjam";
-  }
-  function assertNotFigjam(feature) {
-    if (isFigjam()) throw new Error(`${feature} is not available in FigJam`);
-  }
   const handleWriteCreateRequest = (request2) => __async(null, null, function* () {
     switch (request2.type) {
       case "create_frame": {
@@ -2441,9 +2796,9 @@ ${code}
     });
   };
   const handleRequest = (request2) => __async(null, null, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
-      const result2 = (_a = yield handleReadRequest(request2)) != null ? _a : yield handleWriteRequest(request2);
+      const result2 = (_c = (_b = (_a = yield handleExecuteRequest(request2)) != null ? _a : yield handleFigjamToolRequest(request2)) != null ? _b : yield handleReadRequest(request2)) != null ? _c : yield handleWriteRequest(request2);
       if (result2 === null)
         throw new Error(`Unknown request type: ${request2.type}`);
       return result2;
@@ -2474,7 +2829,7 @@ ${code}
       figma.ui.postMessage({
         type: "ws_config",
         host: (_a = config == null ? void 0 : config.host) != null ? _a : "127.0.0.1",
-        port: (_b = config == null ? void 0 : config.port) != null ? _b : "1994"
+        port: (_b = config == null ? void 0 : config.port) != null ? _b : "1998"
       });
       return;
     }

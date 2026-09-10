@@ -14,7 +14,7 @@ export default function App() {
   // Persisted via figma.clientStorage (through plugin core) because localStorage
   // is unavailable inside Figma's data: URL sandbox.
   const [serverHost, setServerHost] = createSignal("127.0.0.1");
-  const [serverPort, setServerPort] = createSignal("1994");
+  const [serverPort, setServerPort] = createSignal("1998");
 
   const [showSettings, setShowSettings] = createSignal(false);
   const [editHost, setEditHost] = createSignal(serverHost());
@@ -76,7 +76,7 @@ export default function App() {
 
     if (msg.type === "ws_config") {
       setServerHost(msg.host ?? "127.0.0.1");
-      setServerPort(msg.port ?? "1994");
+      setServerPort(msg.port ?? "1998");
       if (!configLoaded) {
         configLoaded = true;
         connect();
@@ -110,7 +110,7 @@ export default function App() {
   function applySettings() {
     setServerHost(editHost().trim() || "127.0.0.1");
     const p = parseInt(editPort(), 10);
-    setServerPort(p > 0 && p <= 65535 ? String(p) : "1994");
+    setServerPort(p > 0 && p <= 65535 ? String(p) : "1998");
     // Persist via plugin core (figma.clientStorage), since localStorage is
     // unavailable in Figma's data: URL environment.
     parent.postMessage(
@@ -203,7 +203,7 @@ export default function App() {
                 class="port-input"
                 value={editPort()}
                 onInput={(e) => setEditPort(e.currentTarget.value)}
-                placeholder="1994"
+                placeholder="1998"
                 onKeyDown={handleKeydown}
               />
               <button class="apply-btn" onClick={applySettings} title="Apply">✓</button>

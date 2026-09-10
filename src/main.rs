@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
     let mut ip = String::from("127.0.0.1");
-    let mut port: u16 = 1994;
+    let mut port: u16 = 1998;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or_else(|_| die("invalid port"));
             }
             "--help" | "-h" => {
-                eprintln!("Usage: figma-mcp-rs [--ip 127.0.0.1] [--port 1994]");
+                eprintln!("Usage: figma-mcp-rs [--ip 127.0.0.1] [--port 1998]");
                 return Ok(());
             }
             other => die(&format!("unknown argument: {other}")),

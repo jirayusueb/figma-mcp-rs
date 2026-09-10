@@ -1,12 +1,12 @@
 ---
 name: bridge-troubleshooting
-description: Diagnose figma-mcp-rs connection problems. Use when tools fail with "plugin not connected", requests time out, the port is already in use, or the Figma plugin cannot reach the MCP server. Covers installing the companion plugin, port 1994, FigJam limits, and running multiple MCP clients.
+description: Diagnose figma-mcp-rs connection problems. Use when tools fail with "plugin not connected", requests time out, the port is already in use, or the Figma plugin cannot reach the MCP server. Covers installing the companion plugin, port 1998, FigJam limits, and running multiple MCP clients.
 ---
 
 # Bridge Troubleshooting
 
 figma-mcp-rs talks to Figma through a companion plugin over a local websocket
-(default ws://127.0.0.1:1994). Every one of the 75 tools needs that plugin
+(default ws://127.0.0.1:1998). Every one of the 84 tools needs that plugin
 running in Figma Desktop. Use this checklist when calls fail.
 
 ## Error: "plugin not connected"
@@ -38,7 +38,7 @@ The plugin is connected but the operation exceeded its deadline (30s default,
 
 ## Error: port already in use
 
-Another process holds port 1994.
+Another process holds port 1998.
 
 - If it is another figma-mcp-rs instance, that is normal: instances elect a
   leader on the port and the rest become followers that forward requests. No
@@ -64,5 +64,5 @@ a follower takes over the port on its next election attempt (3–5s).
 
 1. Figma Desktop open, target file open.
 2. Companion plugin imported and running, window open.
-3. Plugin host/port matches the server (default 127.0.0.1:1994).
+3. Plugin host/port matches the server (default 127.0.0.1:1998).
 4. Retry the failed call; write operations are undoable with Ctrl/Cmd+Z.
