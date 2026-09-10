@@ -1,0 +1,12 @@
+/target
+.git
+plugin/node_modules
+README.md
+skills
+.claude-plugin
+.github
+npm
+glama.json
+server.json
+LICENSE
+Makefile

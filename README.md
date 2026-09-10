@@ -83,6 +83,26 @@ codex mcp add figma-mcp-rs -- npx -y figma-mcp-rs@latest
 }
 ```
 
+**Docker**
+```bash
+docker build -t figma-mcp-rs .
+docker run -i --rm -p 1998:1998 figma-mcp-rs
+```
+
+`.mcp.json` with Docker:
+```json
+{
+  "mcpServers": {
+    "figma-mcp-rs": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-p", "1998:1998", "figma-mcp-rs"]
+    }
+  }
+}
+```
+
+The image listens on `0.0.0.0:1998` (baked into the default `CMD`), so the Figma plugin connects to `ws://127.0.0.1:1998` as usual through the port mapping — keep the host port at `1998` or update the host in the plugin UI. Run one container per plugin connection; for multiple simultaneous MCP clients on one machine prefer the native binary, whose leader election shares a single plugin connection. The self-installed plugin path inside the container is not host-accessible — import the plugin from this repo's `plugin/` directory or the release `plugin.zip` instead.
+
 Server flags: `--ip` (default `127.0.0.1`), `--port` (default `1998`).
 
 ### 2. Install the Figma plugin
