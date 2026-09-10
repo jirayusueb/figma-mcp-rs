@@ -8,10 +8,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use super::McpError;
 use base64::Engine;
 use futures_util::StreamExt;
 use rmcp::model::{CallToolResult, ContentBlock};
-use super::McpError;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,7 +34,10 @@ pub(crate) struct GetScreenshotArgs {
     pub scale: Option<f64>,
 }
 
-pub(crate) async fn get_screenshot(node: Arc<Node>, args: GetScreenshotArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn get_screenshot(
+    node: Arc<Node>,
+    args: GetScreenshotArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "get_screenshot", &args).await
 }
 
@@ -74,7 +77,10 @@ pub(crate) async fn export_frames_to_pdf(
         return Ok(error_result("outputPath must have a .pdf extension"));
     }
 
-    let resp = match node.send("export_frames_to_pdf", args.node_ids.clone(), Value::Null).await {
+    let resp = match node
+        .send("export_frames_to_pdf", args.node_ids.clone(), Value::Null)
+        .await
+    {
         Ok(r) => r,
         Err(e) => return Ok(error_result(e)),
     };
@@ -98,7 +104,10 @@ pub(crate) async fn export_frames_to_pdf(
         }
     }
     if resolved_path.exists() {
-        return Ok(error_result(format!("file already exists: {}", resolved_path.display())));
+        return Ok(error_result(format!(
+            "file already exists: {}",
+            resolved_path.display()
+        )));
     }
     if let Err(e) = std::fs::write(&resolved_path, &merged) {
         return Ok(error_result(format!("write file: {e}")));
@@ -110,7 +119,9 @@ pub(crate) async fn export_frames_to_pdf(
         "pageCount": pages.len(),
         "success": true,
     });
-    Ok(CallToolResult::success(vec![ContentBlock::text(out.to_string())]))
+    Ok(CallToolResult::success(vec![ContentBlock::text(
+        out.to_string(),
+    )]))
 }
 
 /// Parses the plugin response `{frames:[{base64:...},...]}` and returns raw PDF bytes per frame.
@@ -166,7 +177,10 @@ fn merge_pdf_pages(pages: &[Vec<u8>]) -> Result<Vec<u8>, String> {
         max_id = doc.max_id + 1;
 
         for object_id in doc.get_pages().into_values() {
-            let obj = doc.get_object(object_id).map_err(|e| e.to_string())?.to_owned();
+            let obj = doc
+                .get_object(object_id)
+                .map_err(|e| e.to_string())?
+                .to_owned();
             documents_pages.insert(object_id, obj);
         }
         documents_objects.extend(doc.objects);
@@ -201,13 +215,16 @@ fn merge_pdf_pages(pages: &[Vec<u8>]) -> Result<Vec<u8>, String> {
     }
 
     let (pages_id, pages_obj) = pages_object.ok_or("no Pages root found in exported PDFs")?;
-    let (catalog_id, catalog_obj) = catalog_object.ok_or("no Catalog root found in exported PDFs")?;
+    let (catalog_id, catalog_obj) =
+        catalog_object.ok_or("no Catalog root found in exported PDFs")?;
 
     for (object_id, object) in documents_pages.iter() {
         if let Ok(dictionary) = object.as_dict() {
             let mut dictionary = dictionary.clone();
             dictionary.set("Parent", pages_id);
-            document.objects.insert(*object_id, Object::Dictionary(dictionary));
+            document
+                .objects
+                .insert(*object_id, Object::Dictionary(dictionary));
         }
     }
 
@@ -216,16 +233,23 @@ fn merge_pdf_pages(pages: &[Vec<u8>]) -> Result<Vec<u8>, String> {
         dictionary.set("Count", documents_pages.len() as u32);
         dictionary.set(
             "Kids",
-            documents_pages.keys().map(|id| Object::Reference(*id)).collect::<Vec<_>>(),
+            documents_pages
+                .keys()
+                .map(|id| Object::Reference(*id))
+                .collect::<Vec<_>>(),
         );
-        document.objects.insert(pages_id, Object::Dictionary(dictionary));
+        document
+            .objects
+            .insert(pages_id, Object::Dictionary(dictionary));
     }
 
     if let Ok(dictionary) = catalog_obj.as_dict() {
         let mut dictionary = dictionary.clone();
         dictionary.set("Pages", pages_id);
         dictionary.remove(b"Outlines");
-        document.objects.insert(catalog_id, Object::Dictionary(dictionary));
+        document
+            .objects
+            .insert(catalog_id, Object::Dictionary(dictionary));
     }
 
     document.trailer.set("Root", catalog_id);
@@ -313,7 +337,14 @@ pub(crate) async fn save_screenshots(
         .iter()
         .enumerate()
         .map(|(index, item)| {
-            save_screenshot_item(&node, item, index, &work_dir, args.format.as_deref(), args.scale)
+            save_screenshot_item(
+                &node,
+                item,
+                index,
+                &work_dir,
+                args.format.as_deref(),
+                args.scale,
+            )
         })
         .collect();
     let results: Vec<SaveResult> = futures_util::stream::iter(pending)
@@ -331,7 +362,9 @@ pub(crate) async fn save_screenshots(
         "hasErrors": failed > 0,
         "results": results,
     });
-    Ok(CallToolResult::success(vec![ContentBlock::text(out.to_string())]))
+    Ok(CallToolResult::success(vec![ContentBlock::text(
+        out.to_string(),
+    )]))
 }
 
 async fn save_screenshot_item(
@@ -356,7 +389,9 @@ async fn save_screenshot_item(
     };
     let resolved_str = resolved_path.display().to_string();
 
-    let mut format = coalesce(item.format.as_deref(), default_format).unwrap_or("").to_string();
+    let mut format = coalesce(item.format.as_deref(), default_format)
+        .unwrap_or("")
+        .to_string();
     let inferred_format = infer_format(&resolved_path);
     if format.is_empty() {
         format = inferred_format.clone();
@@ -374,17 +409,29 @@ async fn save_screenshot_item(
         };
     }
 
-    let scale = item.scale.filter(|s| *s > 0.0).or_else(|| default_scale.filter(|s| *s > 0.0));
+    let scale = item
+        .scale
+        .filter(|s| *s > 0.0)
+        .or_else(|| default_scale.filter(|s| *s > 0.0));
 
     let mut params = serde_json::json!({ "format": format });
     if let Some(s) = scale {
         params["scale"] = serde_json::json!(s);
     }
 
-    let resp = match node.send("get_screenshot", vec![item.node_id.clone()], params).await {
+    let resp = match node
+        .send("get_screenshot", vec![item.node_id.clone()], params)
+        .await
+    {
         Ok(r) => r,
         Err(e) => {
-            return SaveResult { index, node_id: item.node_id.clone(), output_path: resolved_str, error: e, ..Default::default() };
+            return SaveResult {
+                index,
+                node_id: item.node_id.clone(),
+                output_path: resolved_str,
+                error: e,
+                ..Default::default()
+            };
         }
     };
     if !resp.error_text().is_empty() {
@@ -400,14 +447,26 @@ async fn save_screenshot_item(
     let export = match extract_screenshot_export(resp.data.unwrap_or(Value::Null)) {
         Ok(e) => e,
         Err(e) => {
-            return SaveResult { index, node_id: item.node_id.clone(), output_path: resolved_str, error: e, ..Default::default() };
+            return SaveResult {
+                index,
+                node_id: item.node_id.clone(),
+                output_path: resolved_str,
+                error: e,
+                ..Default::default()
+            };
         }
     };
 
     let bytes_written = match write_base64(&export.base64, &resolved_path) {
         Ok(n) => n,
         Err(e) => {
-            return SaveResult { index, node_id: item.node_id.clone(), output_path: resolved_str, error: e, ..Default::default() };
+            return SaveResult {
+                index,
+                node_id: item.node_id.clone(),
+                output_path: resolved_str,
+                error: e,
+                ..Default::default()
+            };
         }
     };
 
@@ -466,21 +525,31 @@ fn write_base64(b64: &str, output_path: &Path) -> Result<usize, String> {
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
     }
-    match std::fs::OpenOptions::new().write(true).create_new(true).open(output_path) {
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output_path)
+    {
         Ok(mut f) => {
             use std::io::Write;
             f.write_all(&data).map_err(|e| e.to_string())?;
             Ok(data.len())
         }
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            Err(format!("file already exists at outputPath: {}", output_path.display()))
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(format!(
+            "file already exists at outputPath: {}",
+            output_path.display()
+        )),
         Err(e) => Err(e.to_string()),
     }
 }
 
 fn infer_format(path: &Path) -> String {
-    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+    {
         Some("png") => "PNG".to_string(),
         Some("svg") => "SVG".to_string(),
         Some("jpg") | Some("jpeg") => "JPG".to_string(),
@@ -508,7 +577,10 @@ fn must_be_inside_dir(resolved: &Path, work_dir: &Path) -> Result<PathBuf, Strin
     if resolved.strip_prefix(&work_clean).is_ok() {
         Ok(resolved.to_path_buf())
     } else {
-        Err(format!("outputPath must be inside the working directory: {}", work_dir.display()))
+        Err(format!(
+            "outputPath must be inside the working directory: {}",
+            work_dir.display()
+        ))
     }
 }
 
@@ -580,7 +652,7 @@ mod tests {
 
     /// Builds a minimal single-page PDF (Catalog -> Pages -> Page) for merge testing.
     fn build_test_pdf() -> Vec<u8> {
-        use lopdf::{dictionary, Document, Object};
+        use lopdf::{Document, Object, dictionary};
 
         let mut doc = Document::with_version("1.5");
         let pages_id = doc.new_object_id();

@@ -3,8 +3,8 @@
 
 use std::sync::Arc;
 
-use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::State;
+use axum::extract::ws::WebSocketUpgrade;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -77,10 +77,7 @@ async fn handle_ping(State(leader): State<Arc<Leader>>) -> Json<serde_json::Valu
     }))
 }
 
-async fn handle_ws(
-    State(leader): State<Arc<Leader>>,
-    upgrade: WebSocketUpgrade,
-) -> Response {
+async fn handle_ws(State(leader): State<Arc<Leader>>, upgrade: WebSocketUpgrade) -> Response {
     leader.bridge.handle_upgrade(upgrade)
 }
 
@@ -128,6 +125,12 @@ async fn handle_rpc(
 }
 
 fn rpc_error_response(status: StatusCode, error: String) -> Response {
-    (status, Json(RpcResponse { data: None, error: Some(error) })).into_response()
+    (
+        status,
+        Json(RpcResponse {
+            data: None,
+            error: Some(error),
+        }),
+    )
+        .into_response()
 }
-

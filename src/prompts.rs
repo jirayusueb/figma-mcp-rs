@@ -4,8 +4,8 @@
 //! `#[prompt_handler]` impl in `src/tools/mod.rs` picks this up through the
 //! default `Self::prompt_router()` router expression.
 
-use rmcp::model::{GetPromptResult, PromptMessage, Role};
 use rmcp::ErrorData as McpError;
+use rmcp::model::{GetPromptResult, PromptMessage, Role};
 use rmcp::{prompt, prompt_router};
 
 use crate::tools::FigmaServer;
@@ -742,7 +742,10 @@ Report all created node IDs and names. Ask the user if they want further adjustm
 "##;
 
 fn result(description: &str, text: &'static str) -> Result<GetPromptResult, McpError> {
-    Ok(GetPromptResult::new(vec![PromptMessage::new_text(Role::User, text)]).with_description(description))
+    Ok(
+        GetPromptResult::new(vec![PromptMessage::new_text(Role::User, text)])
+            .with_description(description),
+    )
 }
 
 #[prompt_router(vis = "pub(crate)")]

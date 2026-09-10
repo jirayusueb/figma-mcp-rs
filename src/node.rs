@@ -27,7 +27,10 @@ struct NodeState {
 impl Node {
     pub fn new(ip: &str, port: u16, version: &str) -> Self {
         Self {
-            state: RwLock::new(NodeState { role: Role::Unknown, leader: None }),
+            state: RwLock::new(NodeState {
+                role: Role::Unknown,
+                leader: None,
+            }),
             ip: ip.to_string(),
             port,
             version: version.to_string(),
@@ -65,7 +68,10 @@ impl Node {
             let s = self.state.read();
             (s.role, s.leader.clone())
         };
-        eprintln!("[node] tool={tool} role={} nodeIDs={node_ids:?}", role.name());
+        eprintln!(
+            "[node] tool={tool} role={} nodeIDs={node_ids:?}",
+            role.name()
+        );
 
         if role == Role::Leader {
             if let Some(leader) = leader {

@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 

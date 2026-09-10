@@ -2,8 +2,8 @@
 //! Ported from figma-mcp-go internal/bridge.go.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -137,7 +137,11 @@ impl Bridge {
                     if resp.error_text().is_empty() {
                         eprintln!("[bridge] ← {} ok", resp.request_id);
                     } else {
-                        eprintln!("[bridge] ← {} error: {}", resp.request_id, resp.error_text());
+                        eprintln!(
+                            "[bridge] ← {} error: {}",
+                            resp.request_id,
+                            resp.error_text()
+                        );
                     }
                     entry.resolve(resp);
                 }
@@ -229,7 +233,6 @@ impl Bridge {
     pub fn connected(&self) -> bool {
         self.writer.lock().is_some()
     }
-
 
     fn next_id(&self) -> String {
         let n = self.counter.fetch_add(1, Ordering::Relaxed) + 1;

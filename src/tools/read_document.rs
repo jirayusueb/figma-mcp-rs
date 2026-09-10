@@ -16,8 +16,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -48,7 +48,11 @@ pub(crate) struct GetDesignContextArgs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     /// When true, INSTANCE nodes are serialized compactly (mainComponentId + componentProperties + overrides array of differing text/nested content) and unique component definitions are collected once in a top-level componentDefs map. Highly token-efficient for screens with many repeated component instances.
-    #[serde(default, rename = "dedupe_components", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "dedupe_components",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub dedupe_components: Option<bool>,
 }
 
@@ -107,7 +111,10 @@ pub(crate) async fn get_selection(node: Arc<Node>) -> Result<CallToolResult, Mcp
     relay_params(&node, "get_selection", serde_json::Value::Null).await
 }
 
-pub(crate) async fn get_node(node: Arc<Node>, args: GetNodeArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn get_node(
+    node: Arc<Node>,
+    args: GetNodeArgs,
+) -> Result<CallToolResult, McpError> {
     relay(&node, "get_node", &args).await
 }
 
@@ -140,7 +147,12 @@ pub(crate) async fn get_design_context(
     if args.dedupe_components == Some(true) {
         params.insert("dedupeComponents".to_string(), serde_json::json!(true));
     }
-    relay_params(&node, "get_design_context", serde_json::Value::Object(params)).await
+    relay_params(
+        &node,
+        "get_design_context",
+        serde_json::Value::Object(params),
+    )
+    .await
 }
 
 pub(crate) async fn search_nodes(

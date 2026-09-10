@@ -38,19 +38,16 @@ pub fn install() -> Result<PathBuf, String> {
     }
 
     // Write order: directory, files, version marker last.
-    fs::create_dir_all(&dist_dir)
-        .map_err(|e| format!("failed to create dist directory: {e}"))?;
+    fs::create_dir_all(&dist_dir).map_err(|e| format!("failed to create dist directory: {e}"))?;
 
     fs::write(&manifest_path, MANIFEST)
         .map_err(|e| format!("failed to write manifest.json: {e}"))?;
-    fs::write(&code_js_path, CODE_JS)
-        .map_err(|e| format!("failed to write dist/code.js: {e}"))?;
+    fs::write(&code_js_path, CODE_JS).map_err(|e| format!("failed to write dist/code.js: {e}"))?;
     fs::write(&ui_html_path, UI_HTML)
         .map_err(|e| format!("failed to write dist/index.html: {e}"))?;
 
     // Write version marker last so a crash mid-write leaves a stale marker.
-    fs::write(&version_path, pkg_version)
-        .map_err(|e| format!("failed to write .version: {e}"))?;
+    fs::write(&version_path, pkg_version).map_err(|e| format!("failed to write .version: {e}"))?;
 
     Ok(manifest_path)
 }
@@ -85,8 +82,7 @@ mod tests {
 
         let code_js_content = fs::read_to_string(&code_js_path).expect("failed to read code.js");
         assert!(!code_js_content.is_empty());
-        let ui_html_content =
-            fs::read_to_string(&ui_html_path).expect("failed to read index.html");
+        let ui_html_content = fs::read_to_string(&ui_html_path).expect("failed to read index.html");
         assert!(!ui_html_content.is_empty());
 
         let version_path = manifest_path.parent().unwrap().join(".version");
@@ -95,9 +91,7 @@ mod tests {
 
         // Record modification time of code.js.
         let metadata1 = fs::metadata(&code_js_path).expect("failed to get metadata");
-        let modified1 = metadata1
-            .modified()
-            .expect("failed to get modified time");
+        let modified1 = metadata1.modified().expect("failed to get modified time");
 
         // Sleep briefly to ensure time difference is detectable if a write occurred.
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -108,9 +102,7 @@ mod tests {
 
         // Verify modification time is unchanged.
         let metadata2 = fs::metadata(&code_js_path).expect("failed to get metadata");
-        let modified2 = metadata2
-            .modified()
-            .expect("failed to get modified time");
+        let modified2 = metadata2.modified().expect("failed to get modified time");
         assert_eq!(modified1, modified2, "code.js was modified on second call");
 
         // Restore HOME.

@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,10 @@ pub(crate) struct AddPageArgs {
     pub index: Option<f64>,
 }
 
-pub(crate) async fn add_page(node: Arc<Node>, args: AddPageArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn add_page(
+    node: Arc<Node>,
+    args: AddPageArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "add_page", &args).await
 }
 
@@ -39,7 +42,10 @@ pub(crate) struct DeletePageArgs {
     pub page_name: Option<String>,
 }
 
-pub(crate) async fn delete_page(node: Arc<Node>, args: DeletePageArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn delete_page(
+    node: Arc<Node>,
+    args: DeletePageArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "delete_page", &args).await
 }
 
@@ -56,6 +62,9 @@ pub(crate) struct RenamePageArgs {
     pub new_name: String,
 }
 
-pub(crate) async fn rename_page(node: Arc<Node>, args: RenamePageArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn rename_page(
+    node: Arc<Node>,
+    args: RenamePageArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "rename_page", &args).await
 }

@@ -6,9 +6,9 @@ use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 /// Bind 127.0.0.1:0, return the port, drop the listener.
 fn free_port() -> u16 {
@@ -72,11 +72,9 @@ impl Drop for Server {
     }
 }
 
-
 /// Minimal blocking HTTP GET returning the status line's code.
 fn http_get_status(url_host: &str, path: &str) -> Option<u16> {
-    let mut stream =
-        TcpStream::connect(url_host).ok()?;
+    let mut stream = TcpStream::connect(url_host).ok()?;
     write!(
         stream,
         "GET {path} HTTP/1.1\r\nHost: {url_host}\r\nConnection: close\r\n\r\n"
@@ -101,7 +99,9 @@ fn wait_ping(port: u16, timeout: Duration) {
     }
 }
 
-async fn connect_fake_plugin(port: u16) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
+async fn connect_fake_plugin(
+    port: u16,
+) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
     let url = format!("ws://127.0.0.1:{port}/ws")
         .into_client_request()
         .unwrap();
@@ -137,13 +137,13 @@ async fn e2e_full_stack() {
         }),
         1,
     );
-    assert!(
-        init.get("result").is_some(),
-        "initialize failed: {init}"
-    );
+    assert!(init.get("result").is_some(), "initialize failed: {init}");
     assert_eq!(init["result"]["protocolVersion"], "2025-11-25");
     assert_eq!(init["result"]["serverInfo"]["name"], "figma-mcp-rs");
-    assert_eq!(init["result"]["serverInfo"]["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(
+        init["result"]["serverInfo"]["version"],
+        env!("CARGO_PKG_VERSION")
+    );
     server.notify("notifications/initialized");
 
     // tools/list: expect full parity (73 reference + 2 FigJam + use_figma).
@@ -159,10 +159,19 @@ async fn e2e_full_stack() {
         "expected >= 76 tools, got {}: {names:?}",
         names.len()
     );
-    for expected in ["get_metadata", "create_sticky", "create_connector", "save_screenshots", "get_document", "use_figma"] {
-        assert!(names.iter().any(|n| n == expected), "missing tool {expected}");
+    for expected in [
+        "get_metadata",
+        "create_sticky",
+        "create_connector",
+        "save_screenshots",
+        "get_document",
+        "use_figma",
+    ] {
+        assert!(
+            names.iter().any(|n| n == expected),
+            "missing tool {expected}"
+        );
     }
-
 
     // Drive the call from this task: send JSON-RPC line, then pump plugin frames.
     let req = json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
@@ -173,11 +182,14 @@ async fn e2e_full_stack() {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut answered = false;
     while Instant::now() < deadline {
-        let msg = tokio::time::timeout(Duration::from_secs(5), futures_util::StreamExt::next(&mut plugin))
-            .await
-            .expect("plugin frame within 5s")
-            .expect("plugin stream open")
-            .expect("ws message");
+        let msg = tokio::time::timeout(
+            Duration::from_secs(5),
+            futures_util::StreamExt::next(&mut plugin),
+        )
+        .await
+        .expect("plugin frame within 5s")
+        .expect("plugin stream open")
+        .expect("ws message");
         let frame = parse_bridge_frame(&msg).expect("bridge JSON frame");
         let request_id = frame["requestId"].as_str().unwrap().to_string();
         if frame["progress"].as_i64().unwrap_or(0) > 0 {
@@ -189,12 +201,9 @@ async fn e2e_full_stack() {
             "requestId": request_id,
             "data": {"fileName": "E2E-OK", "pages": []}
         });
-        futures_util::SinkExt::send(
-            &mut plugin,
-            Message::Text(resp.to_string().into()),
-        )
-        .await
-        .unwrap();
+        futures_util::SinkExt::send(&mut plugin, Message::Text(resp.to_string().into()))
+            .await
+            .unwrap();
         answered = true;
         break;
     }
@@ -203,21 +212,23 @@ async fn e2e_full_stack() {
     // Read the tools/call response from the server's stdout.
     let mut line = String::new();
     server.stdout.read_line(&mut line).unwrap();
-    assert!(line.contains("E2E-OK"), "tools/call result missing E2E-OK: {line}");
+    assert!(
+        line.contains("E2E-OK"),
+        "tools/call result missing E2E-OK: {line}"
+    );
 
     futures_util::SinkExt::close(&mut plugin).await.ok();
     server.kill();
 }
 
-
 #[tokio::test(flavor = "multi_thread")]
 async fn e2e_election_takeover() {
     let port = free_port();
-    let leader = Server::spawn(port);
+    let _leader = Server::spawn(port);
     wait_ping(port, Duration::from_secs(15));
 
     // Second instance on the same port becomes follower.
-    let mut follower = Command::new(env!("CARGO_BIN_EXE_figma-mcp-rs"))
+    let follower = Command::new(env!("CARGO_BIN_EXE_figma-mcp-rs"))
         .args(["--port", &port.to_string()])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -272,23 +283,26 @@ async fn e2e_save_screenshots_is_concurrent() {
 
     let mut plugin = connect_fake_plugin(port).await;
     let req = json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
-        "name": "save_screenshots",
-        "arguments": {"items": [
-            {"nodeId": "1:1", "outputPath": "a.png"},
-            {"nodeId": "1:2", "outputPath": "b.png"},
-            {"nodeId": "1:3", "outputPath": "c.png"}
-        ]}}});
+    "name": "save_screenshots",
+    "arguments": {"items": [
+        {"nodeId": "1:1", "outputPath": "a.png"},
+        {"nodeId": "1:2", "outputPath": "b.png"},
+        {"nodeId": "1:3", "outputPath": "c.png"}
+    ]}}});
     writeln!(server.child.stdin.as_mut().unwrap(), "{req}").unwrap();
     server.child.stdin.as_mut().unwrap().flush().unwrap();
 
     // Collect all three requests before answering any of them.
     let mut ids = Vec::new();
     while ids.len() < 3 {
-        let msg = tokio::time::timeout(Duration::from_secs(10), futures_util::StreamExt::next(&mut plugin))
-            .await
-            .expect("3 concurrent get_screenshot requests within 10s")
-            .expect("plugin stream open")
-            .expect("ws message");
+        let msg = tokio::time::timeout(
+            Duration::from_secs(10),
+            futures_util::StreamExt::next(&mut plugin),
+        )
+        .await
+        .expect("3 concurrent get_screenshot requests within 10s")
+        .expect("plugin stream open")
+        .expect("ws message");
         let frame = parse_bridge_frame(&msg).expect("bridge JSON frame");
         if frame["progress"].as_i64().unwrap_or(0) > 0 {
             continue;
@@ -311,10 +325,16 @@ async fn e2e_save_screenshots_is_concurrent() {
     let mut line = String::new();
     server.stdout.read_line(&mut line).unwrap();
     let out: Value = serde_json::from_str(&line).unwrap();
-    let payload: Value =
-        serde_json::from_str(out["result"]["content"][0]["text"].as_str().expect("text content"))
-            .unwrap();
-    assert_eq!(payload["succeeded"], 3, "save_screenshots failed: {payload}");
+    let payload: Value = serde_json::from_str(
+        out["result"]["content"][0]["text"]
+            .as_str()
+            .expect("text content"),
+    )
+    .unwrap();
+    assert_eq!(
+        payload["succeeded"], 3,
+        "save_screenshots failed: {payload}"
+    );
     assert_eq!(payload["failed"], 0);
     let results = payload["results"].as_array().unwrap();
     for (i, r) in results.iter().enumerate() {
@@ -353,19 +373,21 @@ async fn e2e_use_figma_round_trip() {
     server.child.stdin.as_mut().unwrap().flush().unwrap();
 
     loop {
-        let msg = tokio::time::timeout(Duration::from_secs(10), futures_util::StreamExt::next(&mut plugin))
-            .await
-            .expect("use_figma request within 10s")
-            .expect("plugin stream open")
-            .expect("ws message");
+        let msg = tokio::time::timeout(
+            Duration::from_secs(10),
+            futures_util::StreamExt::next(&mut plugin),
+        )
+        .await
+        .expect("use_figma request within 10s")
+        .expect("plugin stream open")
+        .expect("ws message");
         let frame = parse_bridge_frame(&msg).expect("bridge JSON frame");
         if frame["progress"].as_i64().unwrap_or(0) > 0 {
             continue;
         }
         assert_eq!(frame["type"], "use_figma");
         assert_eq!(
-            frame["params"]["code"],
-            "return { createdNodeIds: [figma.createFrame().id] }",
+            frame["params"]["code"], "return { createdNodeIds: [figma.createFrame().id] }",
             "plugin reads request.params.code: {frame}"
         );
         let resp = json!({"type": "use_figma", "requestId": frame["requestId"],
@@ -379,12 +401,17 @@ async fn e2e_use_figma_round_trip() {
     let mut line = String::new();
     server.stdout.read_line(&mut line).unwrap();
     let out: Value = serde_json::from_str(&line).unwrap();
-    let payload: Value =
-        serde_json::from_str(out["result"]["content"][0]["text"].as_str().expect("text content"))
-            .unwrap();
-    assert_eq!(payload["result"]["createdNodeIds"][0], "1:7", "unexpected result: {payload}");
+    let payload: Value = serde_json::from_str(
+        out["result"]["content"][0]["text"]
+            .as_str()
+            .expect("text content"),
+    )
+    .unwrap();
+    assert_eq!(
+        payload["result"]["createdNodeIds"][0], "1:7",
+        "unexpected result: {payload}"
+    );
 
     futures_util::SinkExt::close(&mut plugin).await.ok();
     server.kill();
 }
-

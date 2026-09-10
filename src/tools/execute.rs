@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,9 @@ pub(crate) struct ExecuteCodeArgs {
     #[serde(default)]
     pub timeout_ms: Option<f64>,
 }
-pub(crate) async fn execute_code(node: Arc<Node>, args: ExecuteCodeArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn execute_code(
+    node: Arc<Node>,
+    args: ExecuteCodeArgs,
+) -> Result<CallToolResult, McpError> {
     super::relay(&node, "execute_code", &args).await
 }

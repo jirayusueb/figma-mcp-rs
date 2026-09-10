@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
-use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
+use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use serde_json::Value;
 
@@ -62,8 +62,8 @@ impl Follower {
             .map_err(|e| format!("read response: {e}"))?
             .to_bytes();
 
-        let rpc_resp: RpcResponse = serde_json::from_slice(&bytes)
-            .map_err(|e| format!("unmarshal: {e}"))?;
+        let rpc_resp: RpcResponse =
+            serde_json::from_slice(&bytes).map_err(|e| format!("unmarshal: {e}"))?;
 
         if let Some(err) = rpc_resp.error {
             if !err.is_empty() {

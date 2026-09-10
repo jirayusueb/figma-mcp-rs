@@ -22,8 +22,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,10 @@ pub(crate) struct SetTextArgs {
     pub text: String,
 }
 
-pub(crate) async fn set_text(node: Arc<Node>, args: SetTextArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_text(
+    node: Arc<Node>,
+    args: SetTextArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_text", &args).await
 }
 
@@ -57,7 +60,10 @@ pub(crate) struct SetFillsArgs {
     pub mode: Option<String>,
 }
 
-pub(crate) async fn set_fills(node: Arc<Node>, args: SetFillsArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_fills(
+    node: Arc<Node>,
+    args: SetFillsArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_fills", &args).await
 }
 
@@ -76,7 +82,10 @@ pub(crate) struct SetStrokesArgs {
     pub mode: Option<String>,
 }
 
-pub(crate) async fn set_strokes(node: Arc<Node>, args: SetStrokesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_strokes(
+    node: Arc<Node>,
+    args: SetStrokesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_strokes", &args).await
 }
 
@@ -93,7 +102,10 @@ pub(crate) struct MoveNodesArgs {
     pub y: Option<f64>,
 }
 
-pub(crate) async fn move_nodes(node: Arc<Node>, args: MoveNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn move_nodes(
+    node: Arc<Node>,
+    args: MoveNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "move_nodes", &args).await
 }
 
@@ -110,7 +122,10 @@ pub(crate) struct ResizeNodesArgs {
     pub height: Option<f64>,
 }
 
-pub(crate) async fn resize_nodes(node: Arc<Node>, args: ResizeNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn resize_nodes(
+    node: Arc<Node>,
+    args: ResizeNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "resize_nodes", &args).await
 }
 
@@ -123,7 +138,10 @@ pub(crate) struct RenameNodeArgs {
     pub name: String,
 }
 
-pub(crate) async fn rename_node(node: Arc<Node>, args: RenameNodeArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn rename_node(
+    node: Arc<Node>,
+    args: RenameNodeArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "rename_node", &args).await
 }
 
@@ -143,7 +161,10 @@ pub(crate) struct CloneNodeArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn clone_node(node: Arc<Node>, args: CloneNodeArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn clone_node(
+    node: Arc<Node>,
+    args: CloneNodeArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "clone_node", &args).await
 }
 
@@ -156,7 +177,10 @@ pub(crate) struct SetOpacityArgs {
     pub opacity: f64,
 }
 
-pub(crate) async fn set_opacity(node: Arc<Node>, args: SetOpacityArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_opacity(
+    node: Arc<Node>,
+    args: SetOpacityArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_opacity", &args).await
 }
 
@@ -182,7 +206,10 @@ pub(crate) struct SetCornerRadiusArgs {
     pub bottom_right_radius: Option<f64>,
 }
 
-pub(crate) async fn set_corner_radius(node: Arc<Node>, args: SetCornerRadiusArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_corner_radius(
+    node: Arc<Node>,
+    args: SetCornerRadiusArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_corner_radius", &args).await
 }
 
@@ -229,7 +256,10 @@ pub(crate) struct SetAutoLayoutArgs {
     pub counter_axis_spacing: Option<f64>,
 }
 
-pub(crate) async fn set_auto_layout(node: Arc<Node>, args: SetAutoLayoutArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_auto_layout(
+    node: Arc<Node>,
+    args: SetAutoLayoutArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_auto_layout", &args).await
 }
 
@@ -240,7 +270,10 @@ pub(crate) struct DeleteNodesArgs {
     pub node_ids: Vec<String>,
 }
 
-pub(crate) async fn delete_nodes(node: Arc<Node>, args: DeleteNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn delete_nodes(
+    node: Arc<Node>,
+    args: DeleteNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "delete_nodes", &args).await
 }
 
@@ -253,7 +286,10 @@ pub(crate) struct SetVisibleArgs {
     pub visible: bool,
 }
 
-pub(crate) async fn set_visible(node: Arc<Node>, args: SetVisibleArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_visible(
+    node: Arc<Node>,
+    args: SetVisibleArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_visible", &args).await
 }
 
@@ -264,7 +300,10 @@ pub(crate) struct LockNodesArgs {
     pub node_ids: Vec<String>,
 }
 
-pub(crate) async fn lock_nodes(node: Arc<Node>, args: LockNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn lock_nodes(
+    node: Arc<Node>,
+    args: LockNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "lock_nodes", &args).await
 }
 
@@ -275,7 +314,10 @@ pub(crate) struct UnlockNodesArgs {
     pub node_ids: Vec<String>,
 }
 
-pub(crate) async fn unlock_nodes(node: Arc<Node>, args: UnlockNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn unlock_nodes(
+    node: Arc<Node>,
+    args: UnlockNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "unlock_nodes", &args).await
 }
 
@@ -288,7 +330,10 @@ pub(crate) struct RotateNodesArgs {
     pub rotation: f64,
 }
 
-pub(crate) async fn rotate_nodes(node: Arc<Node>, args: RotateNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn rotate_nodes(
+    node: Arc<Node>,
+    args: RotateNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "rotate_nodes", &args).await
 }
 
@@ -301,7 +346,10 @@ pub(crate) struct ReorderNodesArgs {
     pub order: String,
 }
 
-pub(crate) async fn reorder_nodes(node: Arc<Node>, args: ReorderNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn reorder_nodes(
+    node: Arc<Node>,
+    args: ReorderNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "reorder_nodes", &args).await
 }
 
@@ -314,7 +362,10 @@ pub(crate) struct SetBlendModeArgs {
     pub blend_mode: String,
 }
 
-pub(crate) async fn set_blend_mode(node: Arc<Node>, args: SetBlendModeArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_blend_mode(
+    node: Arc<Node>,
+    args: SetBlendModeArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_blend_mode", &args).await
 }
 
@@ -331,7 +382,10 @@ pub(crate) struct SetConstraintsArgs {
     pub vertical: Option<String>,
 }
 
-pub(crate) async fn set_constraints(node: Arc<Node>, args: SetConstraintsArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_constraints(
+    node: Arc<Node>,
+    args: SetConstraintsArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_constraints", &args).await
 }
 
@@ -344,7 +398,10 @@ pub(crate) struct ReparentNodesArgs {
     pub parent_id: String,
 }
 
-pub(crate) async fn reparent_nodes(node: Arc<Node>, args: ReparentNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn reparent_nodes(
+    node: Arc<Node>,
+    args: ReparentNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "reparent_nodes", &args).await
 }
 
@@ -373,7 +430,10 @@ pub(crate) struct BatchRenameNodesArgs {
     pub suffix: Option<String>,
 }
 
-pub(crate) async fn batch_rename_nodes(node: Arc<Node>, args: BatchRenameNodesArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn batch_rename_nodes(
+    node: Arc<Node>,
+    args: BatchRenameNodesArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "batch_rename_nodes", &args).await
 }
 
@@ -395,6 +455,9 @@ pub(crate) struct FindReplaceTextArgs {
     pub regex_flags: Option<String>,
 }
 
-pub(crate) async fn find_replace_text(node: Arc<Node>, args: FindReplaceTextArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn find_replace_text(
+    node: Arc<Node>,
+    args: FindReplaceTextArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "find_replace_text", &args).await
 }

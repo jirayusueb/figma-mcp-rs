@@ -40,18 +40,13 @@ impl BridgeResponse {
 /// Wire format for follower → leader `/rpc` calls.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", default)]
+#[derive(Default)]
 pub struct RpcRequest {
     pub tool: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_ids: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Value>,
-}
-
-impl Default for RpcRequest {
-    fn default() -> Self {
-        Self { tool: String::new(), node_ids: None, params: None }
-    }
 }
 
 /// Returned by the leader `/rpc` endpoint.

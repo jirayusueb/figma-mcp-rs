@@ -1,8 +1,8 @@
 //! Node-ID normalization and leader-side RPC validation.
 //! Ported from figma-mcp-go internal/schema.go.
-use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::{Map, Value};
+use std::sync::LazyLock;
 
 static NODE_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^I?\d+:\d+(;\d+:\d+)*$").expect("valid regex"));
@@ -105,7 +105,10 @@ fn validate_action_type_field(idx: usize, action: &Map<String, Value>) -> Option
     }
     match t {
         "NODE" => {
-            let nav = action.get("navigation").and_then(Value::as_str).unwrap_or("");
+            let nav = action
+                .get("navigation")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             if nav.is_empty() {
                 return Some(format!(
                     "reactions[{idx}].action.navigation is required for NODE (e.g. NAVIGATE, OVERLAY, SCROLL_TO, SWAP, CHANGE_TO)"
@@ -140,7 +143,9 @@ fn validate_reaction(idx: usize, r: &Map<String, Value>) -> Option<String> {
 fn validate_auto_layout_params(params: &Value) -> Option<String> {
     if let Some(lm) = str_param(params, "layoutMode") {
         if !lm.is_empty() && !matches!(lm, "HORIZONTAL" | "VERTICAL" | "NONE") {
-            return Some(format!("layoutMode must be HORIZONTAL, VERTICAL, or NONE, got: {lm}"));
+            return Some(format!(
+                "layoutMode must be HORIZONTAL, VERTICAL, or NONE, got: {lm}"
+            ));
         }
     }
     if let Some(v) = str_param(params, "primaryAxisAlignItems") {
@@ -159,12 +164,16 @@ fn validate_auto_layout_params(params: &Value) -> Option<String> {
     }
     if let Some(v) = str_param(params, "primaryAxisSizingMode") {
         if !v.is_empty() && !matches!(v, "FIXED" | "AUTO") {
-            return Some(format!("primaryAxisSizingMode must be FIXED or AUTO, got: {v}"));
+            return Some(format!(
+                "primaryAxisSizingMode must be FIXED or AUTO, got: {v}"
+            ));
         }
     }
     if let Some(v) = str_param(params, "counterAxisSizingMode") {
         if !v.is_empty() && !matches!(v, "FIXED" | "AUTO") {
-            return Some(format!("counterAxisSizingMode must be FIXED or AUTO, got: {v}"));
+            return Some(format!(
+                "counterAxisSizingMode must be FIXED or AUTO, got: {v}"
+            ));
         }
     }
     if let Some(v) = str_param(params, "layoutWrap") {
@@ -254,7 +263,9 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             if let Some(detail) = str_param(params, "detail") {
                 if !detail.is_empty() && !matches!(detail, "minimal" | "compact" | "full") {
-                    return Some(format!("detail must be minimal, compact, or full, got: {detail}"));
+                    return Some(format!(
+                        "detail must be minimal, compact, or full, got: {detail}"
+                    ));
                 }
             }
         }
@@ -579,7 +590,9 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             if let Some(sm) = str_param(params, "scaleMode") {
                 if !sm.is_empty() && !matches!(sm, "FILL" | "FIT" | "CROP" | "TILE") {
-                    return Some(format!("scaleMode must be FILL, FIT, CROP, or TILE, got: {sm}"));
+                    return Some(format!(
+                        "scaleMode must be FILL, FIT, CROP, or TILE, got: {sm}"
+                    ));
                 }
             }
             if let Some(pid) = str_param(params, "parentId") {
@@ -616,7 +629,9 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             if let Some(unit) = str_param(params, "lineHeightUnit") {
                 if !unit.is_empty() && !matches!(unit, "PIXELS" | "PERCENT") {
-                    return Some(format!("lineHeightUnit must be PIXELS or PERCENT, got: {unit}"));
+                    return Some(format!(
+                        "lineHeightUnit must be PIXELS or PERCENT, got: {unit}"
+                    ));
                 }
             }
             if let Some(unit) = str_param(params, "letterSpacingUnit") {
@@ -635,7 +650,10 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
             if let Some(t) = str_param(params, "type") {
                 if !t.is_empty()
-                    && !matches!(t, "DROP_SHADOW" | "INNER_SHADOW" | "LAYER_BLUR" | "BACKGROUND_BLUR")
+                    && !matches!(
+                        t,
+                        "DROP_SHADOW" | "INNER_SHADOW" | "LAYER_BLUR" | "BACKGROUND_BLUR"
+                    )
                 {
                     return Some(format!(
                         "type must be DROP_SHADOW, INNER_SHADOW, LAYER_BLUR, or BACKGROUND_BLUR, got: {t}"
@@ -668,7 +686,9 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             if style_id.is_empty() {
                 return Some("styleId is required".into());
             }
-            if !has_param(params, "name") && !has_param(params, "color") && !has_param(params, "description")
+            if !has_param(params, "name")
+                && !has_param(params, "color")
+                && !has_param(params, "description")
             {
                 return Some("at least one of name, color, or description is required".into());
             }
@@ -923,7 +943,10 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
                 }
             }
             let order = str_param(params, "order").unwrap_or("");
-            if !matches!(order, "bringToFront" | "sendToBack" | "bringForward" | "sendBackward") {
+            if !matches!(
+                order,
+                "bringToFront" | "sendToBack" | "bringForward" | "sendBackward"
+            ) {
                 return Some(format!(
                     "order must be bringToFront, sendToBack, bringForward, or sendBackward, got: {order}"
                 ));
@@ -946,7 +969,9 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
                 return Some("blendMode is required".into());
             }
             if !valid_blend_mode(blend_mode) {
-                return Some(format!("blendMode {blend_mode:?} is not a valid Figma blend mode"));
+                return Some(format!(
+                    "blendMode {blend_mode:?} is not a valid Figma blend mode"
+                ));
             }
         }
 
@@ -1094,7 +1119,10 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
                     None => return Some(format!("effects[{i}] must be an object")),
                 };
                 let t = em.get("type").and_then(Value::as_str).unwrap_or("");
-                if !matches!(t, "DROP_SHADOW" | "INNER_SHADOW" | "LAYER_BLUR" | "BACKGROUND_BLUR") {
+                if !matches!(
+                    t,
+                    "DROP_SHADOW" | "INNER_SHADOW" | "LAYER_BLUR" | "BACKGROUND_BLUR"
+                ) {
                     return Some(format!(
                         "effects[{i}].type must be DROP_SHADOW, INNER_SHADOW, LAYER_BLUR, or BACKGROUND_BLUR, got: {t}"
                     ));
@@ -1126,7 +1154,10 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
         }
         "create_stickies" => {
-            if !params.get("items").map_or(false, |v| v.is_array() && v.as_array().map_or(false, |a| !a.is_empty())) {
+            if !params
+                .get("items")
+                .is_some_and(|v| v.is_array() && v.as_array().is_some_and(|a| !a.is_empty()))
+            {
                 return Some("items must be a non-empty array".into());
             }
             if let Some(items) = params.get("items").and_then(|v| v.as_array()) {
@@ -1163,11 +1194,8 @@ pub fn validate_rpc(tool: &str, node_ids: &[String], params: &Value) -> Option<S
             }
         }
 
-
-        "use_figma" => {
-            if str_param(params, "code").unwrap_or("").trim().is_empty() {
-                return Some("code is required".into());
-            }
+        "use_figma" if str_param(params, "code").unwrap_or("").trim().is_empty() => {
+            return Some("code is required".into());
         }
 
         _ => {}
@@ -1228,45 +1256,64 @@ mod tests {
     #[test]
     fn get_screenshot_validates_ids_and_format() {
         assert!(validate_rpc("get_screenshot", &ids(&["bad"]), &Value::Null).is_some());
-        assert!(validate_rpc("get_screenshot", &ids(&["1:1"]), &json!({"format": "GIF"})).is_some());
-        assert!(validate_rpc("get_screenshot", &ids(&["1:1"]), &json!({"format": "PNG"})).is_none());
+        assert!(
+            validate_rpc("get_screenshot", &ids(&["1:1"]), &json!({"format": "GIF"})).is_some()
+        );
+        assert!(
+            validate_rpc("get_screenshot", &ids(&["1:1"]), &json!({"format": "PNG"})).is_none()
+        );
     }
 
     #[test]
     fn save_screenshots_validates_items() {
         assert!(validate_rpc("save_screenshots", &[], &Value::Null).is_some());
         assert!(validate_rpc("save_screenshots", &[], &json!({"items": []})).is_some());
-        assert!(validate_rpc(
-            "save_screenshots",
-            &[],
-            &json!({"items": [{"nodeId": "bad", "outputPath": "a.png"}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "save_screenshots",
-            &[],
-            &json!({"items": [{"nodeId": "1:1", "outputPath": ""}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "save_screenshots",
-            &[],
-            &json!({"items": [{"nodeId": "1:1", "outputPath": "a.png"}]})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "save_screenshots",
+                &[],
+                &json!({"items": [{"nodeId": "bad", "outputPath": "a.png"}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "save_screenshots",
+                &[],
+                &json!({"items": [{"nodeId": "1:1", "outputPath": ""}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "save_screenshots",
+                &[],
+                &json!({"items": [{"nodeId": "1:1", "outputPath": "a.png"}]})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn get_design_context_validates_depth_and_detail() {
         assert!(validate_rpc("get_design_context", &[], &json!({"depth": -1})).is_some());
         assert!(validate_rpc("get_design_context", &[], &json!({"detail": "bogus"})).is_some());
-        assert!(validate_rpc("get_design_context", &[], &json!({"depth": 2, "detail": "full"})).is_none());
+        assert!(
+            validate_rpc(
+                "get_design_context",
+                &[],
+                &json!({"depth": 2, "detail": "full"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn search_nodes_requires_query() {
         assert!(validate_rpc("search_nodes", &[], &Value::Null).is_some());
-        assert!(validate_rpc("search_nodes", &[], &json!({"query": "x", "nodeId": "bad"})).is_some());
+        assert!(
+            validate_rpc("search_nodes", &[], &json!({"query": "x", "nodeId": "bad"})).is_some()
+        );
         assert!(validate_rpc("search_nodes", &[], &json!({"query": "x", "limit": 0})).is_some());
         assert!(validate_rpc("search_nodes", &[], &json!({"query": "x"})).is_none());
     }
@@ -1283,18 +1330,22 @@ mod tests {
         assert!(validate_rpc("scan_text_nodes", &[], &Value::Null).is_some());
         assert!(validate_rpc("scan_text_nodes", &[], &json!({"nodeId": "1:1"})).is_none());
         assert!(validate_rpc("scan_nodes_by_types", &[], &json!({"nodeId": "1:1"})).is_some());
-        assert!(validate_rpc(
-            "scan_nodes_by_types",
-            &[],
-            &json!({"nodeId": "1:1", "types": []})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "scan_nodes_by_types",
-            &[],
-            &json!({"nodeId": "1:1", "types": ["TEXT"]})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "scan_nodes_by_types",
+                &[],
+                &json!({"nodeId": "1:1", "types": []})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "scan_nodes_by_types",
+                &[],
+                &json!({"nodeId": "1:1", "types": ["TEXT"]})
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1308,8 +1359,22 @@ mod tests {
     #[test]
     fn set_corner_radius_requires_one_field() {
         assert!(validate_rpc("set_corner_radius", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("set_corner_radius", &ids(&["1:1"]), &json!({"cornerRadius": 4})).is_none());
-        assert!(validate_rpc("set_corner_radius", &ids(&["1:1"]), &json!({"topLeftRadius": 4})).is_none());
+        assert!(
+            validate_rpc(
+                "set_corner_radius",
+                &ids(&["1:1"]),
+                &json!({"cornerRadius": 4})
+            )
+            .is_none()
+        );
+        assert!(
+            validate_rpc(
+                "set_corner_radius",
+                &ids(&["1:1"]),
+                &json!({"topLeftRadius": 4})
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1344,23 +1409,27 @@ mod tests {
         assert!(validate_rpc("create_frame", &[], &json!({"height": -1})).is_some());
         assert!(validate_rpc("create_frame", &[], &json!({"parentId": "bad"})).is_some());
         assert!(validate_rpc("create_frame", &[], &json!({"layoutMode": "SIDEWAYS"})).is_some());
-        assert!(validate_rpc(
-            "create_frame",
-            &[],
-            &json!({"width": 100, "height": 100, "layoutMode": "HORIZONTAL"})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "create_frame",
+                &[],
+                &json!({"width": 100, "height": 100, "layoutMode": "HORIZONTAL"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn set_auto_layout_requires_node_and_validates_params() {
         assert!(validate_rpc("set_auto_layout", &[], &Value::Null).is_some());
-        assert!(validate_rpc(
-            "set_auto_layout",
-            &ids(&["1:1"]),
-            &json!({"primaryAxisSizingMode": "BOGUS"})
-        )
-        .is_some());
+        assert!(
+            validate_rpc(
+                "set_auto_layout",
+                &ids(&["1:1"]),
+                &json!({"primaryAxisSizingMode": "BOGUS"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("set_auto_layout", &ids(&["1:1"]), &Value::Null).is_none());
     }
 
@@ -1368,13 +1437,22 @@ mod tests {
     fn create_rectangle_ellipse_validate_dims() {
         assert!(validate_rpc("create_rectangle", &[], &json!({"width": -1})).is_some());
         assert!(validate_rpc("create_ellipse", &[], &json!({"height": 0})).is_some());
-        assert!(validate_rpc("create_rectangle", &[], &json!({"width": 10, "height": 10})).is_none());
+        assert!(
+            validate_rpc("create_rectangle", &[], &json!({"width": 10, "height": 10})).is_none()
+        );
     }
 
     #[test]
     fn create_text_requires_text() {
         assert!(validate_rpc("create_text", &[], &Value::Null).is_some());
-        assert!(validate_rpc("create_text", &[], &json!({"text": "hi", "parentId": "bad"})).is_some());
+        assert!(
+            validate_rpc(
+                "create_text",
+                &[],
+                &json!({"text": "hi", "parentId": "bad"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("create_text", &[], &json!({"text": "hi"})).is_none());
     }
 
@@ -1388,7 +1466,14 @@ mod tests {
     #[test]
     fn set_fills_and_strokes_require_color() {
         assert!(validate_rpc("set_fills", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("set_fills", &ids(&["1:1"]), &json!({"color": "#FFF", "mode": "bogus"})).is_some());
+        assert!(
+            validate_rpc(
+                "set_fills",
+                &ids(&["1:1"]),
+                &json!({"color": "#FFF", "mode": "bogus"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("set_strokes", &ids(&["1:1"]), &json!({"color": "#FFF"})).is_none());
     }
 
@@ -1415,7 +1500,14 @@ mod tests {
     #[test]
     fn import_image_requires_data_and_validates_scale_mode() {
         assert!(validate_rpc("import_image", &[], &Value::Null).is_some());
-        assert!(validate_rpc("import_image", &[], &json!({"imageData": "abc", "scaleMode": "BOGUS"})).is_some());
+        assert!(
+            validate_rpc(
+                "import_image",
+                &[],
+                &json!({"imageData": "abc", "scaleMode": "BOGUS"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("import_image", &[], &json!({"imageData": "abc"})).is_none());
     }
 
@@ -1423,15 +1515,43 @@ mod tests {
     fn style_creation_tools_require_name() {
         assert!(validate_rpc("create_paint_style", &[], &Value::Null).is_some());
         assert!(validate_rpc("create_paint_style", &[], &json!({"name": "x"})).is_some()); // missing color
-        assert!(validate_rpc("create_paint_style", &[], &json!({"name": "x", "color": "#FFF"})).is_none());
+        assert!(
+            validate_rpc(
+                "create_paint_style",
+                &[],
+                &json!({"name": "x", "color": "#FFF"})
+            )
+            .is_none()
+        );
 
-        assert!(validate_rpc("create_text_style", &[], &json!({"name": "x", "textDecoration": "BOGUS"})).is_some());
+        assert!(
+            validate_rpc(
+                "create_text_style",
+                &[],
+                &json!({"name": "x", "textDecoration": "BOGUS"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("create_text_style", &[], &json!({"name": "x"})).is_none());
 
-        assert!(validate_rpc("create_effect_style", &[], &json!({"name": "x", "type": "BOGUS"})).is_some());
+        assert!(
+            validate_rpc(
+                "create_effect_style",
+                &[],
+                &json!({"name": "x", "type": "BOGUS"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("create_effect_style", &[], &json!({"name": "x"})).is_none());
 
-        assert!(validate_rpc("create_grid_style", &[], &json!({"name": "x", "pattern": "BOGUS"})).is_some());
+        assert!(
+            validate_rpc(
+                "create_grid_style",
+                &[],
+                &json!({"name": "x", "pattern": "BOGUS"})
+            )
+            .is_some()
+        );
         assert!(validate_rpc("create_grid_style", &[], &json!({"name": "x"})).is_none());
     }
 
@@ -1439,7 +1559,14 @@ mod tests {
     fn update_and_delete_style() {
         assert!(validate_rpc("update_paint_style", &[], &Value::Null).is_some());
         assert!(validate_rpc("update_paint_style", &[], &json!({"styleId": "s1"})).is_some());
-        assert!(validate_rpc("update_paint_style", &[], &json!({"styleId": "s1", "name": "x"})).is_none());
+        assert!(
+            validate_rpc(
+                "update_paint_style",
+                &[],
+                &json!({"styleId": "s1", "name": "x"})
+            )
+            .is_none()
+        );
         assert!(validate_rpc("delete_style", &[], &Value::Null).is_some());
         assert!(validate_rpc("delete_style", &[], &json!({"styleId": "s1"})).is_none());
     }
@@ -1450,23 +1577,48 @@ mod tests {
         assert!(validate_rpc("create_variable_collection", &[], &json!({"name": "x"})).is_none());
 
         assert!(validate_rpc("add_variable_mode", &[], &json!({"collectionId": "c1"})).is_some());
-        assert!(validate_rpc("add_variable_mode", &[], &json!({"collectionId": "c1", "modeName": "Dark"})).is_none());
+        assert!(
+            validate_rpc(
+                "add_variable_mode",
+                &[],
+                &json!({"collectionId": "c1", "modeName": "Dark"})
+            )
+            .is_none()
+        );
 
-        assert!(validate_rpc("create_variable", &[], &json!({"name": "x", "collectionId": "c1"})).is_some());
-        assert!(validate_rpc(
-            "create_variable",
-            &[],
-            &json!({"name": "x", "collectionId": "c1", "type": "COLOR"})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "create_variable",
+                &[],
+                &json!({"name": "x", "collectionId": "c1"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "create_variable",
+                &[],
+                &json!({"name": "x", "collectionId": "c1", "type": "COLOR"})
+            )
+            .is_none()
+        );
 
-        assert!(validate_rpc("set_variable_value", &[], &json!({"variableId": "v1", "modeId": "m1"})).is_some());
-        assert!(validate_rpc(
-            "set_variable_value",
-            &[],
-            &json!({"variableId": "v1", "modeId": "m1", "value": 1})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "set_variable_value",
+                &[],
+                &json!({"variableId": "v1", "modeId": "m1"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_variable_value",
+                &[],
+                &json!({"variableId": "v1", "modeId": "m1", "value": 1})
+            )
+            .is_none()
+        );
 
         assert!(validate_rpc("delete_variable", &[], &Value::Null).is_some());
         assert!(validate_rpc("delete_variable", &[], &json!({"variableId": "v1"})).is_none());
@@ -1475,25 +1627,50 @@ mod tests {
     #[test]
     fn linked_tools_validate_ids_and_fields() {
         assert!(validate_rpc("apply_style_to_node", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc(
-            "apply_style_to_node",
-            &ids(&["1:1"]),
-            &json!({"styleId": "s1", "target": "bogus"})
-        )
-        .is_some());
-        assert!(validate_rpc("apply_style_to_node", &ids(&["1:1"]), &json!({"styleId": "s1"})).is_none());
+        assert!(
+            validate_rpc(
+                "apply_style_to_node",
+                &ids(&["1:1"]),
+                &json!({"styleId": "s1", "target": "bogus"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "apply_style_to_node",
+                &ids(&["1:1"]),
+                &json!({"styleId": "s1"})
+            )
+            .is_none()
+        );
 
         assert!(validate_rpc("bind_variable_to_node", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc(
-            "bind_variable_to_node",
-            &ids(&["1:1"]),
-            &json!({"variableId": "v1", "field": "fills"})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "bind_variable_to_node",
+                &ids(&["1:1"]),
+                &json!({"variableId": "v1", "field": "fills"})
+            )
+            .is_none()
+        );
 
         assert!(validate_rpc("swap_component", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("swap_component", &ids(&["1:1"]), &json!({"componentId": "bad"})).is_some());
-        assert!(validate_rpc("swap_component", &ids(&["1:1"]), &json!({"componentId": "2:2"})).is_none());
+        assert!(
+            validate_rpc(
+                "swap_component",
+                &ids(&["1:1"]),
+                &json!({"componentId": "bad"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "swap_component",
+                &ids(&["1:1"]),
+                &json!({"componentId": "2:2"})
+            )
+            .is_none()
+        );
 
         assert!(validate_rpc("detach_instance", &[], &Value::Null).is_some());
         assert!(validate_rpc("detach_instance", &ids(&["1:1"]), &Value::Null).is_none());
@@ -1502,37 +1679,66 @@ mod tests {
     #[test]
     fn set_reactions_validates_array_and_entries() {
         assert!(validate_rpc("set_reactions", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("set_reactions", &ids(&["1:1"]), &json!({"reactions": "nope"})).is_some());
-        assert!(validate_rpc(
-            "set_reactions",
-            &ids(&["1:1"]),
-            &json!({"reactions": [{"trigger": {"type": "BOGUS"}}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "set_reactions",
-            &ids(&["1:1"]),
-            &json!({"reactions": [{"trigger": {"type": "AFTER_TIMEOUT"}}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "set_reactions",
-            &ids(&["1:1"]),
-            &json!({"reactions": [{"action": {"type": "URL"}}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "set_reactions",
-            &ids(&["1:1"]),
-            &json!({"reactions": [{"action": {"type": "URL", "url": "https://x"}}]})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "set_reactions",
+                &ids(&["1:1"]),
+                &json!({"reactions": "nope"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_reactions",
+                &ids(&["1:1"]),
+                &json!({"reactions": [{"trigger": {"type": "BOGUS"}}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_reactions",
+                &ids(&["1:1"]),
+                &json!({"reactions": [{"trigger": {"type": "AFTER_TIMEOUT"}}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_reactions",
+                &ids(&["1:1"]),
+                &json!({"reactions": [{"action": {"type": "URL"}}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_reactions",
+                &ids(&["1:1"]),
+                &json!({"reactions": [{"action": {"type": "URL", "url": "https://x"}}]})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn remove_reactions_validates_indices() {
-        assert!(validate_rpc("remove_reactions", &ids(&["1:1"]), &json!({"indices": ["x"]})).is_some());
-        assert!(validate_rpc("remove_reactions", &ids(&["1:1"]), &json!({"indices": [0, 1]})).is_none());
+        assert!(
+            validate_rpc(
+                "remove_reactions",
+                &ids(&["1:1"]),
+                &json!({"indices": ["x"]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "remove_reactions",
+                &ids(&["1:1"]),
+                &json!({"indices": [0, 1]})
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1556,56 +1762,134 @@ mod tests {
     #[test]
     fn reorder_nodes_validates_order() {
         assert!(validate_rpc("reorder_nodes", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("reorder_nodes", &ids(&["1:1"]), &json!({"order": "bogus"})).is_some());
-        assert!(validate_rpc("reorder_nodes", &ids(&["1:1"]), &json!({"order": "bringToFront"})).is_none());
+        assert!(
+            validate_rpc("reorder_nodes", &ids(&["1:1"]), &json!({"order": "bogus"})).is_some()
+        );
+        assert!(
+            validate_rpc(
+                "reorder_nodes",
+                &ids(&["1:1"]),
+                &json!({"order": "bringToFront"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn set_blend_mode_validates_mode() {
         assert!(validate_rpc("set_blend_mode", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("set_blend_mode", &ids(&["1:1"]), &json!({"blendMode": "BOGUS"})).is_some());
-        assert!(validate_rpc("set_blend_mode", &ids(&["1:1"]), &json!({"blendMode": "MULTIPLY"})).is_none());
+        assert!(
+            validate_rpc(
+                "set_blend_mode",
+                &ids(&["1:1"]),
+                &json!({"blendMode": "BOGUS"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_blend_mode",
+                &ids(&["1:1"]),
+                &json!({"blendMode": "MULTIPLY"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn set_constraints_requires_axis_and_validates_values() {
         assert!(validate_rpc("set_constraints", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc(
-            "set_constraints",
-            &ids(&["1:1"]),
-            &json!({"horizontal": "BOGUS"})
-        )
-        .is_some());
-        assert!(validate_rpc("set_constraints", &ids(&["1:1"]), &json!({"vertical": "CENTER"})).is_none());
+        assert!(
+            validate_rpc(
+                "set_constraints",
+                &ids(&["1:1"]),
+                &json!({"horizontal": "BOGUS"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_constraints",
+                &ids(&["1:1"]),
+                &json!({"vertical": "CENTER"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn reparent_nodes_requires_valid_parent() {
         assert!(validate_rpc("reparent_nodes", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("reparent_nodes", &ids(&["1:1"]), &json!({"parentId": "bad"})).is_some());
-        assert!(validate_rpc("reparent_nodes", &ids(&["1:1"]), &json!({"parentId": "2:2"})).is_none());
+        assert!(
+            validate_rpc(
+                "reparent_nodes",
+                &ids(&["1:1"]),
+                &json!({"parentId": "bad"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "reparent_nodes",
+                &ids(&["1:1"]),
+                &json!({"parentId": "2:2"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn batch_rename_nodes_requires_one_op_and_pairs_find_replace() {
         assert!(validate_rpc("batch_rename_nodes", &ids(&["1:1"]), &Value::Null).is_some());
-        assert!(validate_rpc("batch_rename_nodes", &ids(&["1:1"]), &json!({"find": "a"})).is_some());
-        assert!(validate_rpc(
-            "batch_rename_nodes",
-            &ids(&["1:1"]),
-            &json!({"find": "a", "replace": "b"})
-        )
-        .is_none());
-        assert!(validate_rpc("batch_rename_nodes", &ids(&["1:1"]), &json!({"prefix": "x"})).is_none());
+        assert!(
+            validate_rpc("batch_rename_nodes", &ids(&["1:1"]), &json!({"find": "a"})).is_some()
+        );
+        assert!(
+            validate_rpc(
+                "batch_rename_nodes",
+                &ids(&["1:1"]),
+                &json!({"find": "a", "replace": "b"})
+            )
+            .is_none()
+        );
+        assert!(
+            validate_rpc(
+                "batch_rename_nodes",
+                &ids(&["1:1"]),
+                &json!({"prefix": "x"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn find_replace_text_requires_find_and_replace() {
         assert!(validate_rpc("find_replace_text", &[], &Value::Null).is_some());
         assert!(validate_rpc("find_replace_text", &[], &json!({"find": "a"})).is_some());
-        assert!(validate_rpc("find_replace_text", &[], &json!({"find": "a", "replace": "b", "nodeId": "bad"})).is_some());
-        assert!(validate_rpc("find_replace_text", &ids(&["bad"]), &json!({"find": "a", "replace": "b"})).is_some());
-        assert!(validate_rpc("find_replace_text", &[], &json!({"find": "a", "replace": "b"})).is_none());
+        assert!(
+            validate_rpc(
+                "find_replace_text",
+                &[],
+                &json!({"find": "a", "replace": "b", "nodeId": "bad"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "find_replace_text",
+                &ids(&["bad"]),
+                &json!({"find": "a", "replace": "b"})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "find_replace_text",
+                &[],
+                &json!({"find": "a", "replace": "b"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1617,25 +1901,36 @@ mod tests {
         assert!(validate_rpc("delete_page", &[], &json!({"pageId": "1:1"})).is_none());
 
         assert!(validate_rpc("rename_page", &[], &json!({"pageId": "1:1"})).is_some());
-        assert!(validate_rpc("rename_page", &[], &json!({"pageId": "1:1", "newName": "New"})).is_none());
+        assert!(
+            validate_rpc(
+                "rename_page",
+                &[],
+                &json!({"pageId": "1:1", "newName": "New"})
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn set_effects_validates_array_and_types() {
         assert!(validate_rpc("set_effects", &ids(&["1:1"]), &Value::Null).is_some());
         assert!(validate_rpc("set_effects", &ids(&["1:1"]), &json!({"effects": "nope"})).is_some());
-        assert!(validate_rpc(
-            "set_effects",
-            &ids(&["1:1"]),
-            &json!({"effects": [{"type": "BOGUS"}]})
-        )
-        .is_some());
-        assert!(validate_rpc(
-            "set_effects",
-            &ids(&["1:1"]),
-            &json!({"effects": [{"type": "DROP_SHADOW"}]})
-        )
-        .is_none());
+        assert!(
+            validate_rpc(
+                "set_effects",
+                &ids(&["1:1"]),
+                &json!({"effects": [{"type": "BOGUS"}]})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "set_effects",
+                &ids(&["1:1"]),
+                &json!({"effects": [{"type": "DROP_SHADOW"}]})
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1659,10 +1954,45 @@ mod tests {
 
     #[test]
     fn execute_code_rejects_out_of_range_timeout() {
-        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 0})).is_some());
-        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 25001})).is_some());
-        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 1})).is_none());
-        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 25000})).is_none());
-        assert!(validate_rpc("execute_code", &[], &json!({"code": "return 1", "timeoutMs": 5000})).is_none());
+        assert!(
+            validate_rpc(
+                "execute_code",
+                &[],
+                &json!({"code": "return 1", "timeoutMs": 0})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "execute_code",
+                &[],
+                &json!({"code": "return 1", "timeoutMs": 25001})
+            )
+            .is_some()
+        );
+        assert!(
+            validate_rpc(
+                "execute_code",
+                &[],
+                &json!({"code": "return 1", "timeoutMs": 1})
+            )
+            .is_none()
+        );
+        assert!(
+            validate_rpc(
+                "execute_code",
+                &[],
+                &json!({"code": "return 1", "timeoutMs": 25000})
+            )
+            .is_none()
+        );
+        assert!(
+            validate_rpc(
+                "execute_code",
+                &[],
+                &json!({"code": "return 1", "timeoutMs": 5000})
+            )
+            .is_none()
+        );
     }
 }

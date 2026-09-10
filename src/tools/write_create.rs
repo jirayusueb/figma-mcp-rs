@@ -10,8 +10,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -79,7 +79,10 @@ pub(crate) struct CreateFrameArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn create_frame(node: Arc<Node>, args: CreateFrameArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_frame(
+    node: Arc<Node>,
+    args: CreateFrameArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_frame", &args).await
 }
 
@@ -112,7 +115,10 @@ pub(crate) struct CreateRectangleArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn create_rectangle(node: Arc<Node>, args: CreateRectangleArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_rectangle(
+    node: Arc<Node>,
+    args: CreateRectangleArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_rectangle", &args).await
 }
 
@@ -142,7 +148,10 @@ pub(crate) struct CreateEllipseArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn create_ellipse(node: Arc<Node>, args: CreateEllipseArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_ellipse(
+    node: Arc<Node>,
+    args: CreateEllipseArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_ellipse", &args).await
 }
 
@@ -177,7 +186,10 @@ pub(crate) struct CreateTextArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn create_text(node: Arc<Node>, args: CreateTextArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_text(
+    node: Arc<Node>,
+    args: CreateTextArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_text", &args).await
 }
 
@@ -209,7 +221,10 @@ pub(crate) struct ImportImageArgs {
     pub parent_id: Option<String>,
 }
 
-pub(crate) async fn import_image(node: Arc<Node>, args: ImportImageArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn import_image(
+    node: Arc<Node>,
+    args: ImportImageArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "import_image", &args).await
 }
 
@@ -223,7 +238,10 @@ pub(crate) struct CreateComponentArgs {
     pub name: Option<String>,
 }
 
-pub(crate) async fn create_component(node: Arc<Node>, args: CreateComponentArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_component(
+    node: Arc<Node>,
+    args: CreateComponentArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_component", &args).await
 }
 
@@ -247,6 +265,9 @@ pub(crate) struct CreateSectionArgs {
     pub height: Option<f64>,
 }
 
-pub(crate) async fn create_section(node: Arc<Node>, args: CreateSectionArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn create_section(
+    node: Arc<Node>,
+    args: CreateSectionArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "create_section", &args).await
 }

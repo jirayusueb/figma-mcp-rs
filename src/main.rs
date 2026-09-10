@@ -52,12 +52,14 @@ async fn main() -> anyhow::Result<()> {
         Err(e) => eprintln!("[plugin] could not install plugin assets: {e}"),
     }
 
-
     let node = Arc::new(node::Node::new(&ip, port, version));
     let election = Arc::new(election::Election::new(Arc::clone(&node), &ip, port));
     election.start().await;
 
-    eprintln!("Starting figma-mcp-rs {version} (role: {})", node.role_name());
+    eprintln!(
+        "Starting figma-mcp-rs {version} (role: {})",
+        node.role_name()
+    );
 
     {
         let shutdown_node = Arc::clone(&node);
@@ -78,7 +80,6 @@ async fn main() -> anyhow::Result<()> {
     node.stop();
     Ok(())
 }
-
 
 fn die(msg: &str) -> ! {
     eprintln!("{msg}");

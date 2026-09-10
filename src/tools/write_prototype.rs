@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use rmcp::model::CallToolResult;
 use super::McpError;
+use rmcp::model::CallToolResult;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,10 @@ pub(crate) struct SetReactionsArgs {
     pub mode: Option<String>,
 }
 
-pub(crate) async fn set_reactions(node: Arc<Node>, args: SetReactionsArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn set_reactions(
+    node: Arc<Node>,
+    args: SetReactionsArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "set_reactions", &args).await
 }
 
@@ -38,6 +41,9 @@ pub(crate) struct RemoveReactionsArgs {
     pub indices: Option<Vec<f64>>,
 }
 
-pub(crate) async fn remove_reactions(node: Arc<Node>, args: RemoveReactionsArgs) -> Result<CallToolResult, McpError> {
+pub(crate) async fn remove_reactions(
+    node: Arc<Node>,
+    args: RemoveReactionsArgs,
+) -> Result<CallToolResult, McpError> {
     crate::tools::relay(&node, "remove_reactions", &args).await
 }
